@@ -1,0 +1,9 @@
+{
+	"name": "siryul",
+	"description": "A minimal D application.",
+	"copyright": "Copyright © 2015, Cameron",
+	"authors": ["Cameron"],
+	"dependencies": {
+		"dyaml": "~>0.5.2"
+	}
+}
