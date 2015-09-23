@@ -1,6 +1,6 @@
 module siryul.json;
 import siryul;
-import std.json;
+private import std.json : JSONValue, parseJSON, toJSON, JSON_TYPE;
 import std.traits, std.range;
 import std.typecons;
 
@@ -44,9 +44,11 @@ private @property JSONValue asJSONValue(T)(T type) @trusted if (!isInfinite!T) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
-			if(hasIndirections!(typeof(__traits(getMember, type, member))) && (__traits(getMember, type, member) == __traits(getMember, type, member).init))
-				continue;
-			output.object[member] = __traits(getMember, type, member).asJSONValue;
+			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
+				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+				output.object[memberName] = __traits(getMember, type, member).asJSONValue;
+			} else 
+				output.object[member] = __traits(getMember, type, member).asJSONValue;
 		}
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
@@ -59,7 +61,10 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	import std.range.primitives : ElementType;
 	static if (is(T == enum)) {
 		import std.conv : to;
-		return node.str.to!T;
+		if (node.type == JSON_TYPE.STRING)
+			return node.str.to!T;
+		else
+			return node.fromValue!(OriginalType!T).to!T;
 	} else static if (isIntegral!T) {
 		enforce(node.type == JSON_TYPE.INTEGER, new JSONException("Expecting integer, got "~node.type.text));
 		return cast(T)node.integer;
@@ -85,15 +90,29 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		enforce(node.type == JSON_TYPE.OBJECT, new JSONException("Expecting object, got "~node.type.text));
 		T output;
 		foreach (member; FieldNameTuple!T) {
-			static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-				if (member !in node.object)
-					continue;
-			} else
-				enforce(member in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
-			try {
-				__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[member]);
-			} catch (JSONException e) {
-				throw new JSONException("Error reading member "~member~": "~e.msg);
+			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
+				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+					if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
+						continue;
+				} else
+					enforce(memberName in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
+				try {
+					__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[memberName]);
+				} catch (Exception e) {
+					throw new JSONException("Error reading member "~member~": "~e.msg);
+				}
+			} else {
+				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+					if ((member !in node.object) || (node.object[member].type == JSON_TYPE.NULL))
+						continue;
+				} else
+					enforce(member in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
+				try {
+					__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[member]);
+				} catch (Exception e) {
+					throw new JSONException("Error reading member "~member~": "~e.msg);
+				}
 			}
 		}
 		return output;

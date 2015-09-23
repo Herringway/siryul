@@ -47,7 +47,7 @@ version(unittest) {
 }
 unittest {
 	import std.stdio : writeln;
-	import std.algorithm : filter;
+	import std.algorithm : filter, canFind;
 	import std.file;
 	struct Test {
 		string a;
@@ -76,6 +76,52 @@ unittest {
 
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
+	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
+
+	assert(`---
+a: beep
+b: 2
+c: 4
+d:
+- derp
+- blorp
+e:
+  two: 3
+  one: 1
+g:
+  Test2:
+    inner: test
+h: 4.5`.fromString!(Test,YAML) == testInstance);
+	assert(`---
+a: beep
+b: 2
+c: 4
+d:
+- derp
+- blorp
+e:
+  two: 3
+  one: 1
+f: false
+g:
+  Test2:
+    inner: test
+h: 4.5`.fromString!(Test,YAML) == testInstance);
+	assert(`---
+a: beep
+b: 2
+c: 4
+d:
+- derp
+- blorp
+e:
+  two: 3
+  one: 1
+f: ~
+g:
+  Test2:
+    inner: test
+h: 4.5`.fromString!(Test,YAML) == testInstance);
 	
 	RunTest(testInstance);
 
@@ -91,7 +137,10 @@ unittest {
 
 	RunTest2([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
-	enum testEnum { test, something, wont, ya }
+	enum testEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
+	
+	assert(`3`.fromString!(testEnum,JSON) == testEnum.wont);
+	//assert(`3`.fromString!(testEnum,YAML) == testEnum.wont);
 
 	RunTest2(testEnum.something, testEnum.something);
 	RunTest2(testEnum.something, "something");
@@ -100,6 +149,7 @@ unittest {
 		import std.typecons;
 		uint notNull;
 		string aString;
+		uint[] emptyArray;
 		Nullable!uint aNullable;
 		Nullable!(uint,0) anotherNullable;
 	}
@@ -110,6 +160,8 @@ unittest {
 	assert(resultJSON.notNull == 0);
 	assert(resultYAML.aString == "");
 	assert(resultJSON.aString == "");
+	assert(resultYAML.emptyArray == []);
+	assert(resultJSON.emptyArray == []);
 	assert(resultYAML.aNullable.isNull());
 	assert(resultJSON.aNullable.isNull());
 	assert(resultYAML.anotherNullable.isNull());
@@ -118,6 +170,14 @@ unittest {
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
 	RunTest(nullableTest2);
+
+	struct SiryulizeAsTest {
+		@SiryulizeAs("word") string something;
+	}
+	RunTest(SiryulizeAsTest("a"));
+	assert(SiryulizeAsTest("a").asString!YAML.canFind("word"));
+	assert(SiryulizeAsTest("a").asString!JSON.canFind("word"));
+
 }
 
 class SiryulException : Exception {
@@ -138,7 +198,7 @@ class DeserializeException : SiryulException {
 enum Optional;
 enum AsString;
 enum AsBinary;
-
+struct SiryulizeAs { string name; }
 
 template isNullable(T) {
 	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
@@ -149,3 +209,16 @@ template isNullable(T) {
 static assert(isNullable!(Nullable!int));
 static assert(isNullable!(Nullable!(int, 0)));
 static assert(!isNullable!int);
+template getUDAValue(alias T, UDA) {
+	enum getUDAValue = () {
+		static assert(hasUDA!(T, UDA));
+		foreach(uda; __traits(getAttributes, T))
+			static if(is(typeof(uda) == UDA))
+				return uda;
+		assert(0);
+	}();
+}
+unittest {
+	@SiryulizeAs("a") string thinger;
+	static assert(getUDAValue!(thinger, SiryulizeAs).name == "a");
+}

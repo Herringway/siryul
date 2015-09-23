@@ -40,11 +40,16 @@ class YAMLException : DeserializeException {
 private T populate(T)(Node node) @safe if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range;
 	import std.range.primitives : ElementType;
+	if (node.isNull)
+		return T.init;
 	try {
 		static if (is(T == enum)) {
 			import std.conv : to;
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			return node.get!string.to!T;
+			//if (node.tag == `tag:yaml.org,2002:str`)
+				return node.get!string.to!T;
+			//else
+			//	return node.populate!(OriginalType!T).to!T;
 		} else static if (isNullable!T) {
 			T output;
 			if (node.isNull())
@@ -65,12 +70,22 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (member; FieldNameTuple!T) {
-				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if (!node.containsKey(member))
-						continue;
-				} else
-					enforce(node.containsKey(member), new YAMLException("Missing non-@Optional "~member~" in node"));
-				__traits(getMember, output, member) = populate!(typeof(__traits(getMember, T, member)))(node[member]);
+				static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
+					enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+						if (!node.containsKey(memberName))
+							continue;
+					} else
+						enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
+					__traits(getMember, output, member) = populate!(typeof(__traits(getMember, T, member)))(node[memberName]);
+				} else {
+					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+						if (!node.containsKey(member))
+							continue;
+					} else
+						enforce(node.containsKey(member), new YAMLException("Missing non-@Optional "~member~" in node"));
+					__traits(getMember, output, member) = populate!(typeof(__traits(getMember, T, member)))(node[member]);
+				}
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
@@ -152,9 +167,11 @@ private @property Node toNode(T)(T type) @safe if (!isInfinite!T) {
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
-			if(hasIndirections!(typeof(__traits(getMember, type, member))) && (__traits(getMember, type, member) == __traits(getMember, type, member).init))
-				continue;
-			output.add(member, __traits(getMember, type, member).toNode);
+			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
+				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+				output.add(memberName, __traits(getMember, type, member).toNode);
+			} else
+				output.add(member, __traits(getMember, type, member).toNode);
 		}
 		return output;
 	} else
