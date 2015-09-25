@@ -58,15 +58,16 @@ unittest {
 		@Optional bool f = false;
 		Test2[string] g;
 		double h;
+		char i;
 	}
 	void RunTest2(T, U)(T input, U expected) {
-		assert(input.asString!YAML.fromString!(U, YAML) == expected);
-		assert(input.asString!JSON.fromString!(U, JSON) == expected);
+		assert(input.asString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
+		assert(input.asString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
 	}
 	void RunTest(T)(T expected) {
 		RunTest2(expected, expected);
 	}
-	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5);
+	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');
 	scope(exit) if ("test.json".exists) remove("test.json");
 	scope(exit) if ("test.yml".exists) remove("test.yml");
 	testInstance.writeFile("test.json");
@@ -74,9 +75,9 @@ unittest {
 	assert(fromFile!(Test)("test.json") == testInstance);
 	assert(fromFile!(Test)("test.yml") == testInstance);
 
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5}`.fromString!(Test,JSON) == testInstance);
+	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
+	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
+	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
 
 	assert(`---
 a: beep
@@ -91,7 +92,8 @@ e:
 g:
   Test2:
     inner: test
-h: 4.5`.fromString!(Test,YAML) == testInstance);
+h: 4.5
+i: g`.fromString!(Test,YAML) == testInstance);
 	assert(`---
 a: beep
 b: 2
@@ -106,7 +108,8 @@ f: false
 g:
   Test2:
     inner: test
-h: 4.5`.fromString!(Test,YAML) == testInstance);
+h: 4.5
+i: g`.fromString!(Test,YAML) == testInstance);
 	assert(`---
 a: beep
 b: 2
@@ -121,9 +124,21 @@ f: ~
 g:
   Test2:
     inner: test
-h: 4.5`.fromString!(Test,YAML) == testInstance);
+h: 4.5
+i: g`.fromString!(Test,YAML) == testInstance);
 	
 	RunTest(testInstance);
+
+	struct stringCharTest {
+		char a;
+		wchar b;
+		dchar c;
+		string d;
+		wstring e;
+		dstring f;
+	}
+	RunTest(stringCharTest('a', '‽', '\U00010300', "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ"));
+
 
 	int[4] staticArray = [0, 1, 2, 3];
 	RunTest(staticArray);
@@ -177,6 +192,7 @@ h: 4.5`.fromString!(Test,YAML) == testInstance);
 	RunTest(SiryulizeAsTest("a"));
 	assert(SiryulizeAsTest("a").asString!YAML.canFind("word"));
 	assert(SiryulizeAsTest("a").asString!JSON.canFind("word"));
+
 
 }
 

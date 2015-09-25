@@ -28,9 +28,14 @@ private @property JSONValue asJSONValue(T)(T type) @trusted if (!isInfinite!T) {
 			output = JSONValue(type.get());
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		output = JSONValue(type.toISOExtString());
-	} else static if (isIntegral!T || isSomeString!T || is(T == bool) || isFloatingPoint!T) {
+	} else static if (isIntegral!T || is(T == string) || is(T == bool) || isFloatingPoint!T) {
 		output = JSONValue(type);
-	} else static if(isAssociativeArray!T) {
+	} else static if (isSomeString!T) {
+		import std.utf;
+		output = JSONValue(type.toUTF8);
+	} else static if (isSomeChar!T) {
+		output = [type].idup.asJSONValue;
+	} else static if (isAssociativeArray!T) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (key, value; type)
@@ -82,7 +87,12 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
 		if (node.type == JSON_TYPE.NULL)
 			return "";
-		return cast(T)node.str;
+		return node.str.to!T;
+	} else static if (isSomeChar!T) {
+		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
+		if (node.type == JSON_TYPE.NULL)
+			return '\0';
+		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		enforce(node.type == JSON_TYPE.STRING, new JSONException("Expecting timestamp string, got "~node.type.text));
 		return T.fromISOExtString(node.str);

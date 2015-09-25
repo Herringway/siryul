@@ -38,7 +38,7 @@ class YAMLException : DeserializeException {
 	}
 }
 private T populate(T)(Node node) @safe if (!isInfinite!T) {
-	import std.traits, std.exception, std.datetime, std.range;
+	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
 	if (node.isNull)
 		return T.init;
@@ -60,6 +60,9 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			return node.get!T;
+		} else static if (isSomeChar!T) {
+			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			return node.get!(T[])[0];
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			return cast(T)node.get!SysTime;
@@ -135,7 +138,7 @@ unittest {
 		assert(populate!testStruct(node) == testStruct(1, "testString"));
 	}
 }
-private @property Node toNode(T)(T type) @safe if (!isInfinite!T) {
+private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
 	import std.conv : text;
 	static if (hasUDA!(type, AsString) || is(T == enum)) {
@@ -151,14 +154,19 @@ private @property Node toNode(T)(T type) @safe if (!isInfinite!T) {
 		return Node(type.toISOExtString(), "tag:yaml.org,2002:timestamp");
 	} else static if (is(T == TimeOfDay)) {
 		return Node(type.toISOExtString());
-	} else static if (isIntegral!T || isSomeString!T || is(T == bool) || isFloatingPoint!T) {
+	} else static if (isSomeChar!T) {
+		return [type].toNode;
+	} else static if (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string)) {
 		return Node(type);
+	} else static if (isSomeString!T) {
+		import std.utf;
+		return type.toUTF8().idup.toNode;
 	} else static if(isAssociativeArray!T) {
 		Node[Node] output;
 		foreach (key, value; type)
 			output[key.toNode] = value.toNode;
 		return Node(output);
-	} else static if(isInputRange!T || isArray!T) {
+	} else static if(isInputRange!T || (isArray!T && !isSomeString!T)) {
 		Node[] output;
 		foreach (value; type)
 			output ~= value.toNode;
@@ -176,4 +184,7 @@ private @property Node toNode(T)(T type) @safe if (!isInfinite!T) {
 		return output;
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
+}
+static this() {
+	assert(Node("\U00010300").get!string == "\U00010300");
 }
