@@ -3,7 +3,11 @@ import siryul;
 private import std.json : JSONValue, parseJSON, toJSON, JSON_TYPE;
 import std.traits, std.range;
 import std.typecons;
-
+/++
+ + JSON (JavaScript Object Notation) serialization format
+ +
+ + Note that only strings are supported for associative array keys in this format.
+ +/
 struct JSON {
 	static T parseString(T)(string data) {
 		return parseJSON(data).fromValue!T();

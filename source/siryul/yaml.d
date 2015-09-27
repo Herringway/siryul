@@ -5,6 +5,11 @@ import std.range.primitives : isInfinite;
 import std.stream : MemoryStream, SeekPos;
 import std.typecons;
 
+/++
+ + YAML (YAML Ain't Markup Language) serialization format
+ +
+ + Bugs: Support for enums stored as their underlying types currently unavailable due to library deficiencies.
+ +/
 struct YAML {
 	static T parseString(T)(string data) @safe {
 		auto loader = Loader.fromString(data.dup).load();

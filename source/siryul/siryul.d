@@ -1,11 +1,47 @@
+/++
+ + Macros:
+ + SUPPORTEDFORMATS = YAML, JSON
+ + SUPPORTEDAUTOFORMATS = .yml, .yaml for YAML and .json for JSON
+ +/
 module siryul.siryul;
 import siryul;
 import std.typecons, std.traits;
 
+/++
+ + Reads serialized data from a file.
+ +
+ + Files are assumed to be UTF-8 encoded.
+ + Params:
+ + T = Type stored in the file
+ + Format = Serialization format ($(SUPPORTEDFORMATS))
+ + path = Absolute or relative path to the file
+ + Examples:
+ + --------------------
+ + `auto anInteger = fromFile!(uint, YAML)("data.yml");`
+ + `auto aString = fromFile!(string, JSON)("data.json");`
+ + `auto aStruct = fromFile!(someStruct, YAML)("data.yml");`
+ + --------------------
+ + Returns: Data from the file in the format specified
+ +/
 T fromFile(T, Format)(string path) {
 	import std.file : read;
 	return fromString!(T,Format)(cast(string)path.read());
 }
+/++
+ + Reads serialized data from a file with automatic format detection based on filename
+ +
+ + Currently supports $(SUPPORTEDAUTOFORMATS).
+ + Params:
+ + T = Type stored in the file
+ + path = Absolute or relative path to the file
+ + Examples:
+ + --------------------
+ + `auto anInteger = fromFile!uint("data.yml");`
+ + `auto aString = fromFile!string("data.json");`
+ + `auto aStruct = fromFile!someStruct("data.yml");`
+ + --------------------
+ + Returns: Data from the file in the format specified
+ +/
 T fromFile(T)(string path) {
 	import std.path;
 	switch(path.extension) {
@@ -17,16 +53,71 @@ T fromFile(T)(string path) {
 			throw new SerializeException("Unknown extension");
 	}
 }
-T fromString(T, Format)(string data) {
-	return Format.parseString!T(data);
+/++
+ + Deserializes data from a UTF-8 encoded string in the given format.
+ + 
+ + Params:
+ + T = Type of the data to be deserialized
+ + Format = Serialization format ($(SUPPORTEDFORMATS))
+ + str = A string containing serialized data in the specified format
+ + Examples:
+ + --------------------
+ + `auto anInteger = fromFile!uint("data.yml");`
+ + `auto aString = fromFile!string("data.json");`
+ + `auto aStruct = fromFile!someStruct("data.yml");`
+ + --------------------
+ + Returns: Data contained in the string
+ +/
+T fromString(T, Format)(string str) {
+	return Format.parseString!T(str);
 }
+/++
+ + Serializes data to a string in the specified format.
+ +
+ + UTF-8 encoded by default.
+ + Params:
+ + Format = Serialization format ($(SUPPORTEDFORMATS))
+ + data = The data to be serialized
+ + Examples:
+ + --------------------
+ + `assert(3.asString!JSON == `3`);`
+ + `assert("str".asString!JSON == `"str"`);`
+ + --------------------
+ + Returns: A string in the specified format representing the user's data, UTF-8 encoded
+ +/
 @property string asString(Format, T)(T data) {
 	return Format.asString(data);
 }
+/++
+ + Writes serialized data to a file.
+ +
+ + Any format supported by this library may be specified.
+ + For best results, stick to structs, built-in data types, Nullable and std.DateTime structs. 
+ + Examples:
+ + --------------------
+ + `3.writeFile!YAML("data.yml");`
+ + `"str".writeFile!JSON("data.json");`
+ + `someStruct a; a.writeFile!YAML("data.yml");`
+ + --------------------
+ +/
 void writeFile(Format, T)(T data, string path) {
 	import std.stdio : File;
 	File(path, "w").write(data.asString!Format);
 }
+/++
+ + Writes serialized data to a file with automatic format detection based on filename
+ +
+ + Currently supports $(SUPPORTEDAUTOFORMATS).
+ + Params:
+ + data = Data to be serialized and stored
+ + path = Absolute or relative path to the file
+ + Examples:
+ + --------------------
+ + `3.writeFile("data.yml");`
+ + `"str".writeFile("data.json");`
+ + `someStruct a; a.writeFile("data.yml");`
+ + --------------------
+ +/
 void writeFile(T)(T data, string path) {
 	import std.path;
 	switch(path.extension) {
@@ -78,7 +169,10 @@ unittest {
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
-
+	
+	assert(3.asString!JSON == `3`);
+	assert("str".asString!JSON == `"str"`);
+	
 	assert(`---
 a: beep
 b: 2
