@@ -142,6 +142,9 @@ unittest {
 		node.add("b", "testString");
 		assert(populate!testStruct(node) == testStruct(1, "testString"));
 	}
+	import std.exception : assertThrown;
+	assertThrown(populate!string(Node([4])));
+	assertThrown(populate!double(Node("trees")));
 }
 private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
