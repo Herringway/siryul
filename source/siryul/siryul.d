@@ -17,9 +17,9 @@ import std.typecons, std.traits;
  + path = Absolute or relative path to the file
  + Examples:
  + --------------------
- + `auto anInteger = fromFile!(uint, YAML)("data.yml");`
- + `auto aString = fromFile!(string, JSON)("data.json");`
- + `auto aStruct = fromFile!(someStruct, YAML)("data.yml");`
+ + auto anInteger = fromFile!(uint, YAML)("data.yml");
+ + auto aString = fromFile!(string, JSON)("data.json");
+ + auto aStruct = fromFile!(someStruct, YAML)("data.yml");
  + --------------------
  + Returns: Data from the file in the format specified
  +/
@@ -36,9 +36,9 @@ T fromFile(T, Format)(string path) {
  + path = Absolute or relative path to the file
  + Examples:
  + --------------------
- + `auto anInteger = fromFile!uint("data.yml");`
- + `auto aString = fromFile!string("data.json");`
- + `auto aStruct = fromFile!someStruct("data.yml");`
+ + auto anInteger = fromFile!uint("data.yml");
+ + auto aString = fromFile!string("data.json");
+ + auto aStruct = fromFile!someStruct("data.yml");
  + --------------------
  + Returns: Data from the file in the format specified
  +/
@@ -62,9 +62,9 @@ T fromFile(T)(string path) {
  + str = A string containing serialized data in the specified format
  + Examples:
  + --------------------
- + `auto anInteger = fromFile!uint("data.yml");`
- + `auto aString = fromFile!string("data.json");`
- + `auto aStruct = fromFile!someStruct("data.yml");`
+ + auto anInteger = fromFile!uint("data.yml");
+ + auto aString = fromFile!string("data.json");
+ + auto aStruct = fromFile!someStruct("data.yml");
  + --------------------
  + Returns: Data contained in the string
  +/
@@ -80,8 +80,8 @@ T fromString(T, Format)(string str) {
  + data = The data to be serialized
  + Examples:
  + --------------------
- + `assert(3.asString!JSON == `3`);`
- + `assert("str".asString!JSON == `"str"`);`
+ + assert(3.asString!JSON == `3`);
+ + assert("str".asString!JSON == `"str"`);
  + --------------------
  + Returns: A string in the specified format representing the user's data, UTF-8 encoded
  +/
@@ -95,9 +95,9 @@ T fromString(T, Format)(string str) {
  + For best results, stick to structs, built-in data types, Nullable and std.DateTime structs. 
  + Examples:
  + --------------------
- + `3.writeFile!YAML("data.yml");`
- + `"str".writeFile!JSON("data.json");`
- + `someStruct a; a.writeFile!YAML("data.yml");`
+ + 3.writeFile!YAML("data.yml");
+ + "str".writeFile!JSON("data.json");
+ + someStruct a; a.writeFile!YAML("data.yml");
  + --------------------
  +/
 void writeFile(Format, T)(T data, string path) {
@@ -113,9 +113,9 @@ void writeFile(Format, T)(T data, string path) {
  + path = Absolute or relative path to the file
  + Examples:
  + --------------------
- + `3.writeFile("data.yml");`
- + `"str".writeFile("data.json");`
- + `someStruct a; a.writeFile("data.yml");`
+ + 3.writeFile("data.yml");
+ + "str".writeFile("data.json");
+ + someStruct a; a.writeFile("data.yml");
  + --------------------
  +/
 void writeFile(T)(T data, string path) {
