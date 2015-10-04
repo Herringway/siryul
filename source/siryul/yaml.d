@@ -56,11 +56,7 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 			//else
 			//	return node.populate!(OriginalType!T).to!T;
 		} else static if (isNullable!T) {
-			T output;
-			if (node.isNull())
-				output.nullify();
-			else
-				output = node.get!(TemplateArgsOf!T[0]);
+			T output = node.get!(TemplateArgsOf!T[0]);
 			return output;
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
