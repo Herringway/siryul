@@ -111,22 +111,14 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 						continue;
 				} else
 					enforce(memberName in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
-				try {
-					__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[memberName]);
-				} catch (Exception e) {
-					throw new JSONException("Error reading member "~member~": "~e.msg);
-				}
+				__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[memberName]);
 			} else {
 				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
 					if ((member !in node.object) || (node.object[member].type == JSON_TYPE.NULL))
 						continue;
 				} else
 					enforce(member in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
-				try {
-					__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[member]);
-				} catch (Exception e) {
-					throw new JSONException("Error reading member "~member~": "~e.msg);
-				}
+				__traits(getMember, output, member) = fromValue!(typeof(__traits(getMember, T, member)))(node[member]);
 			}
 		}
 		return output;
@@ -158,7 +150,6 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	} else
 		static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
 }
-
 class JSONException : DeserializeException {
 	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
