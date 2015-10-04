@@ -4,5 +4,6 @@
 ## Supported formats
 * YAML
 * JSON
+
 ## Supported platforms
 * All known
