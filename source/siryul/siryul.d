@@ -176,7 +176,7 @@ unittest {
 	void RunTest2(T, U)(T input, U expected) {
 		assert(input.asString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
 		assert(input.asString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
-		static if (is(T == struct) && is(U == struct) && !isTimeType!T && !isTimeType!U) {
+		static if (__traits(compiles, fromString!U(""))) {
 			assert(input.asString!YAML.fromString!U == expected, "Automagic YAML Serialization of "~T.stringof~" failed");
 			assert(input.asString!JSON.fromString!U == expected, "Automagic JSON Serialization of "~T.stringof~" failed");
 		}
