@@ -1,8 +1,11 @@
 {
 	"name": "siryul",
-	"description": "A minimal D application.",
+	"description": "A simple multi-format serialization library.",
 	"copyright": "Copyright © 2015, Cameron",
-	"authors": ["Cameron"],
+	"authors": ["Cameron \"Herringway\" Ross"],
+	"license": "BSL-1.0",
+	"targetType": "library",
+	"homepage": "https://github.com/Herringway/siryul",
 	"dependencies": {
 		"dyaml": "~>0.5.2"
 	}
