@@ -7,6 +7,6 @@
 	"targetType": "library",
 	"homepage": "https://github.com/Herringway/siryul",
 	"dependencies": {
-		"dyaml": "~>0.5.2"
+		"dyaml": "~>0.5.3"
 	}
 }
