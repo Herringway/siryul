@@ -68,6 +68,7 @@ private @property JSONValue asJSONValue(T)(T type) @trusted if (!isInfinite!T) {
 private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
+	import std.conv : to;
 	static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
@@ -76,7 +77,7 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 			return node.fromValue!(OriginalType!T).to!T;
 	} else static if (isIntegral!T) {
 		enforce(node.type == JSON_TYPE.INTEGER, new JSONException("Expecting integer, got "~node.type.text));
-		return cast(T)node.integer;
+		return node.integer.to!T;
 	} else static if (isNullable!T) {
 		T output;
 		if (node.type == JSON_TYPE.NULL)
@@ -86,7 +87,7 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		return output;
 	} else static if (isFloatingPoint!T) {
 		enforce(node.type == JSON_TYPE.FLOAT, new JSONException("Expecting floating point, got "~node.type.text));
-		return cast(T)node.floating;
+		return node.floating.to!T;
 	} else static if (isSomeString!T) {
 		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
 		if (node.type == JSON_TYPE.NULL)

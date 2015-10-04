@@ -45,11 +45,11 @@ class YAMLException : DeserializeException {
 private T populate(T)(Node node) @safe if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
+	import std.conv : to;
 	if (node.isNull)
 		return T.init;
 	try {
 		static if (is(T == enum)) {
-			import std.conv : to;
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			//if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
@@ -66,7 +66,7 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 			return node.get!(T[])[0];
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			return cast(T)node.get!SysTime;
+			return node.get!SysTime.to!T;
 		} else static if (is(T == TimeOfDay)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			return TimeOfDay.fromISOExtString(node.get!string);
