@@ -13,7 +13,7 @@ import std.typecons;
 struct YAML {
 	static T parseString(T)(string data) @safe {
 		auto loader = Loader.fromString(data.dup).load();
-		return populate!T(loader);
+		return loader.fromYAML!T;
 	}
 	static string asString(T)(T data) @safe {
 		MemoryStream stream;
@@ -26,7 +26,7 @@ struct YAML {
 		representer.defaultScalarStyle = ScalarStyle.Plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
-		dumper.dump(data.toNode());
+		dumper.dump(data.toYAML());
 		return stream.toStr;
 	}
 }
@@ -42,7 +42,7 @@ class YAMLException : DeserializeException {
 		super(msg, file, line);
 	}
 }
-private T populate(T)(Node node) @safe if (!isInfinite!T) {
+private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
 	import std.conv : to;
@@ -54,7 +54,7 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 			//if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			//else
-			//	return node.populate!(OriginalType!T).to!T;
+			//	return node.fromYAML!(OriginalType!T).to!T;
 		} else static if (isNullable!T) {
 			T output = node.get!(TemplateArgsOf!T[0]);
 			return output;
@@ -81,14 +81,14 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 							continue;
 					} else
 						enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
-					__traits(getMember, output, member) = populate!(typeof(__traits(getMember, T, member)))(node[memberName]);
+					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)));
 				} else {
 					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
 						if (!node.containsKey(member))
 							continue;
 					} else
 						enforce(node.containsKey(member), new YAMLException("Missing non-@Optional "~member~" in node"));
-					__traits(getMember, output, member) = populate!(typeof(__traits(getMember, T, member)))(node[member]);
+					__traits(getMember, output, member) = node[member].fromYAML!(typeof(__traits(getMember, T, member)));
 				}
 			}
 			return output;
@@ -96,20 +96,20 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
 			T output;
 			foreach (Node newNode; node)
-				output ~= populate!(ElementType!T)(newNode);
+				output ~= fromYAML!(ElementType!T)(newNode);
 			return output;
 		} else static if(isStaticArray!T) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
 			T output;
 			size_t i;
 			foreach (Node newNode; node)
-				output[i++] = populate!(ElementType!T)(newNode);
+				output[i++] = fromYAML!(ElementType!T)(newNode);
 			return output;
 		} else static if(isAssociativeArray!T) {
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (Node key, Node value; node)
-				output[populate!(KeyType!T)(key)] = populate!(ValueType!T)(value);
+				output[fromYAML!(KeyType!T)(key)] = fromYAML!(ValueType!T)(value);
 			return output;
 		} else static if (is(T == bool)) {
 			return node.get!T;
@@ -119,7 +119,7 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 		throw new YAMLException(e.msg);
 	}
 }
-private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
+private @property Node toYAML(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
 	import std.conv : text;
 	static if (hasUDA!(type, AsString) || is(T == enum)) {
@@ -128,7 +128,7 @@ private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 		if (type.isNull)
 			return Node(YAMLNull());
 		else
-			return type.get().toNode;
+			return type.get().toYAML;
 	} else static if (is(T == SysTime)) {
 		return Node(type, "tag:yaml.org,2002:timestamp");
 	} else static if (is(T == DateTime) || is(T == Date)) {
@@ -136,21 +136,21 @@ private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 	} else static if (is(T == TimeOfDay)) {
 		return Node(type.toISOExtString());
 	} else static if (isSomeChar!T) {
-		return [type].toNode;
+		return [type].toYAML;
 	} else static if (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string)) {
 		return Node(type);
 	} else static if (isSomeString!T) {
 		import std.utf;
-		return type.toUTF8().idup.toNode;
+		return type.toUTF8().idup.toYAML;
 	} else static if(isAssociativeArray!T) {
 		Node[Node] output;
 		foreach (key, value; type)
-			output[key.toNode] = value.toNode;
+			output[key.toYAML] = value.toYAML;
 		return Node(output);
 	} else static if(isInputRange!T || (isArray!T && !isSomeString!T)) {
 		Node[] output;
 		foreach (value; type)
-			output ~= value.toNode;
+			output ~= value.toYAML;
 		return Node(output);
 	} else static if (is(T == struct)) {
 		static string[] empty;
@@ -158,9 +158,9 @@ private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 		foreach (member; FieldNameTuple!T) {
 			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
 				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-				output.add(memberName, __traits(getMember, type, member).toNode);
+				output.add(memberName, __traits(getMember, type, member).toYAML);
 			} else
-				output.add(member, __traits(getMember, type, member).toNode);
+				output.add(member, __traits(getMember, type, member).toYAML);
 		}
 		return output;
 	} else
