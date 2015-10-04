@@ -7,3 +7,4 @@ dub.selections.json
 *.lib
 *.exe
 *.lst
+docs
