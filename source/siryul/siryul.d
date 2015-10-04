@@ -62,9 +62,9 @@ T fromFile(T)(string path) {
  + str = A string containing serialized data in the specified format
  + Examples:
  + --------------------
- + auto anInteger = fromFile!uint("data.yml");
- + auto aString = fromFile!string("data.json");
- + auto aStruct = fromFile!someStruct("data.yml");
+ + auto aStruct = fromString!(testStruct, JSON)(`{"a": "b"}`);
+ + auto anotherStruct = fromString!(testStruct, YAML)("---\na: b");
+ + assert(aStruct == anotherStruct);
  + --------------------
  + Returns: Data contained in the string
  +/
