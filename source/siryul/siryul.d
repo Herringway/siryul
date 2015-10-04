@@ -139,6 +139,7 @@ version(unittest) {
 unittest {
 	import std.stdio : writeln;
 	import std.algorithm : filter, canFind;
+	import std.exception : assertThrown;
 	import std.file;
 	struct Test {
 		string a;
@@ -158,18 +159,24 @@ unittest {
 	void RunTest(T)(T expected) {
 		RunTest2(expected, expected);
 	}
+	void runBadTest(T, U)(U value) {
+		assertThrown(value.asString!YAML.fromString!(T, YAML));
+		assertThrown(value.asString!JSON.fromString!(T, JSON));
+	}
 	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');
 	scope(exit) if ("test.json".exists) remove("test.json");
 	scope(exit) if ("test.yml".exists) remove("test.yml");
 	testInstance.writeFile("test.json");
 	testInstance.writeFile("test.yml");
+	assertThrown(testInstance.writeFile("test.blatantlyinvalidextension"));
 	assert(fromFile!(Test)("test.json") == testInstance);
 	assert(fromFile!(Test)("test.yml") == testInstance);
+	assertThrown(fromFile!Test("test.blatantlyinvalidextension"));
 
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
 	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
-	
+
 	assert(3.asString!JSON == `3`);
 	assert("str".asString!JSON == `"str"`);
 	
@@ -233,6 +240,7 @@ i: g`.fromString!(Test,YAML) == testInstance);
 	}
 	RunTest(stringCharTest('a', '‽', '\U00010300', "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ"));
 
+	assert(`{"a": null, "b": null, "c": null, "d": null, "e": null, "f": null}`.fromString!(stringCharTest,JSON) == stringCharTest.init);
 
 	int[4] staticArray = [0, 1, 2, 3];
 	RunTest(staticArray);
@@ -287,7 +295,24 @@ i: g`.fromString!(Test,YAML) == testInstance);
 	assert(SiryulizeAsTest("a").asString!YAML.canFind("word"));
 	assert(SiryulizeAsTest("a").asString!JSON.canFind("word"));
 
+	struct testNull2 {
+		@Optional @SiryulizeAs("v") Nullable!bool value;
+	}
+	auto testval = testNull2();
+	testval.value = true;
+	RunTest(testval);
+	testval.value = false;
+	RunTest(testval);
+	assert(testNull2().asString!YAML.fromString!(testNull2, YAML).value.isNull);
+	assert(testNull2().asString!JSON.fromString!(testNull2, JSON).value.isNull);
+	assert(`{}`.fromString!(testNull2, JSON).value.isNull);
+	assert(`---`.fromString!(testNull2, YAML).value.isNull);
 
+	runBadTest!bool("b");
+	assert(`null`.fromString!(wstring, JSON) == "");
+	assert(`null`.fromString!(wstring, YAML) == "");
+	assert(`null`.fromString!(wchar, JSON) == wchar.init);
+	assert(`null`.fromString!(wchar, YAML) == wchar.init);
 }
 
 class SiryulException : Exception {

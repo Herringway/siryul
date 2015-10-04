@@ -123,29 +123,6 @@ private T populate(T)(Node node) @safe if (!isInfinite!T) {
 		throw new YAMLException(e.msg);
 	}
 }
-version(unittest) {
-	enum testEnum { test, something, wont, ya }
-	struct testStruct {
-		uint a;
-		string b;
-	}
-}
-unittest {
-	assert(populate!string(Node("Hello.")) == "Hello.");
-	assert(populate!byte(Node(0)) == 0);
-	assert(populate!byte(Node(-128)) == -128);
-	assert(populate!(string[])(Node(["Hello", "World"])) == ["Hello", "World"]);
-	assert(populate!(string[2])(Node(["Hello", "World"])) == ["Hello", "World"]);
-	assert(populate!testEnum(Node("wont")) == testEnum.wont);
-	{
-		auto node = Node(["a": 1]);
-		node.add("b", "testString");
-		assert(populate!testStruct(node) == testStruct(1, "testString"));
-	}
-	import std.exception : assertThrown;
-	assertThrown(populate!string(Node([4])));
-	assertThrown(populate!double(Node("trees")));
-}
 private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
 	import std.conv : text;
@@ -192,7 +169,4 @@ private @property Node toNode(T)(T type) @trusted if (!isInfinite!T) {
 		return output;
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
-}
-static this() {
-	assert(Node("\U00010300").get!string == "\U00010300");
 }
