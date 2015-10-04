@@ -90,12 +90,12 @@ private T fromValue(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	} else static if (isSomeString!T) {
 		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
 		if (node.type == JSON_TYPE.NULL)
-			return "";
+			return T.init;
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
 		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
 		if (node.type == JSON_TYPE.NULL)
-			return '\0';
+			return T.init;
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		enforce(node.type == JSON_TYPE.STRING, new JSONException("Expecting timestamp string, got "~node.type.text));
