@@ -72,6 +72,26 @@ T fromString(T, Format)(string str) {
 	return Format.parseString!T(str);
 }
 /++
+ + Deserializes data from a UTF-8 encoded string with automatic format detection.
+ +
+ + Params:
+ + T = Type of the data to be deserialized
+ + str = A string containing serialized data in the specified format
+ + Examples:
+ + --------------------
+ + auto aStruct = fromString!testStruct(`{"a": "b"}`);
+ + auto anotherStruct = fromString!testStruct("---\na: b");
+ + assert(aStruct == anotherStruct);
+ + --------------------
+ + Returns: Data contained in the string
+ +/
+T fromString(T)(string str) if (is(T == struct) && !isTimeType!T) {
+	if (str[0] == '{')
+		return fromString!(T, JSON)(str);
+	return fromString!(T, YAML)(str);
+}
+
+/++
  + Serializes data to a string in the specified format.
  +
  + UTF-8 encoded by default.
@@ -141,6 +161,7 @@ unittest {
 	import std.algorithm : filter, canFind;
 	import std.exception : assertThrown;
 	import std.file;
+	import std.datetime;
 	struct Test {
 		string a;
 		uint b;
@@ -155,6 +176,10 @@ unittest {
 	void RunTest2(T, U)(T input, U expected) {
 		assert(input.asString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
 		assert(input.asString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
+		static if (is(T == struct) && is(U == struct) && !isTimeType!T && !isTimeType!U) {
+			assert(input.asString!YAML.fromString!U == expected, "Automagic YAML Serialization of "~T.stringof~" failed");
+			assert(input.asString!JSON.fromString!U == expected, "Automagic JSON Serialization of "~T.stringof~" failed");
+		}
 	}
 	void RunTest(T)(T expected) {
 		RunTest2(expected, expected);
@@ -245,7 +270,6 @@ i: g`.fromString!(Test,YAML) == testInstance);
 	int[4] staticArray = [0, 1, 2, 3];
 	RunTest(staticArray);
 
-	import std.datetime;
 
 	RunTest(TimeOfDay(01, 01, 01));
 	RunTest(Date(2000, 01, 01));
@@ -340,6 +364,10 @@ template isNullable(T) {
 		enum isNullable = true;
 	else
 		enum isNullable = false;
+}
+template isTimeType(T) {
+	import std.datetime;
+	enum isTimeType = is(T == DateTime) || is(T == SysTime) || is(T == TimeOfDay) || is(T == Date);
 }
 static assert(isNullable!(Nullable!int));
 static assert(isNullable!(Nullable!(int, 0)));
