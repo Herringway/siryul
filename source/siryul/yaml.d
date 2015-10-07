@@ -7,8 +7,6 @@ import std.typecons;
 
 /++
  + YAML (YAML Ain't Markup Language) serialization format
- +
- + Bugs: Support for enums stored as their underlying types currently unavailable due to library deficiencies.
  +/
 struct YAML {
 	static T parseString(T)(string data) @safe {
@@ -51,15 +49,17 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 	try {
 		static if (is(T == enum)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			//if (node.tag == `tag:yaml.org,2002:str`)
+			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
-			//else
-			//	return node.fromYAML!(OriginalType!T).to!T;
+			else
+				return node.fromYAML!(OriginalType!T).to!T;
 		} else static if (isNullable!T) {
 			T output = node.get!(TemplateArgsOf!T[0]);
 			return output;
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			if (node.tag == `tag:yaml.org,2002:str`)
+				return node.get!string.to!T;
 			return node.get!T;
 		} else static if (isSomeChar!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));

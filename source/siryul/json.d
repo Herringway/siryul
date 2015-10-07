@@ -9,10 +9,10 @@ import std.typecons;
  + Note that only strings are supported for associative array keys in this format.
  +/
 struct JSON {
-	static T parseString(T)(string data) {
+	static T parseString(T)(string data) @trusted {
 		return parseJSON(data).fromJSON!T();
 	}
-	static string asString(T)(T data) {
+	static string asString(T)(T data) @trusted {
 		auto json = data.toJSON;
 		return (&json).toJSON(true);
 	}
@@ -29,6 +29,8 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		else
 			return node.fromJSON!(OriginalType!T).to!T;
 	} else static if (isIntegral!T) {
+		if (node.type == JSON_TYPE.STRING)
+			return node.str.to!T;
 		enforce(node.type == JSON_TYPE.INTEGER, new JSONException("Expecting integer, got "~node.type.text));
 		return node.integer.to!T;
 	} else static if (isNullable!T) {
@@ -39,10 +41,13 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 			output = node.fromJSON!(TemplateArgsOf!T[0]);
 		return output;
 	} else static if (isFloatingPoint!T) {
+		if (node.type == JSON_TYPE.STRING)
+			return node.str.to!T;
 		enforce(node.type == JSON_TYPE.FLOAT, new JSONException("Expecting floating point, got "~node.type.text));
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
-		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
+		if (node.type == JSON_TYPE.INTEGER)
+			return node.integer.to!T;
 		if (node.type == JSON_TYPE.NULL)
 			return T.init;
 		return node.str.to!T;
