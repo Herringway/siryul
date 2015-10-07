@@ -1,155 +1,227 @@
 /++
  + Macros:
- + SUPPORTEDFORMATS = YAML, JSON
- + SUPPORTEDAUTOFORMATS = .yml, .yaml for YAML and .json for JSON
+ + 	SUPPORTEDFORMATS = YAML, JSON, AutoDetect
+ + 	SUPPORTEDAUTOFORMATS = .yml, .yaml for YAML and .json for JSON
+ + 	SUPPORTEDSTRUCTURES = structs, built-in data types, Nullable, and std.datetime structs
  +/
 module siryul.siryul;
 import siryul;
 import std.typecons, std.traits;
 
 /++
- + Reads serialized data from a file.
+ + Deserializes data from a file.
  +
- + Files are assumed to be UTF-8 encoded.
+ + Files are assumed to be UTF-8 encoded. If no format (or AutoDetect) is
+ + specified, an attempt at autodetection is made.
+ +
+ + Supports $(SUPPORTEDSTRUCTURES).
+ +
  + Params:
  + T = Type stored in the file
  + Format = Serialization format ($(SUPPORTEDFORMATS))
  + path = Absolute or relative path to the file
- + Examples:
- + --------------------
- + auto anInteger = fromFile!(uint, YAML)("data.yml");
- + auto aString = fromFile!(string, JSON)("data.json");
- + auto aStruct = fromFile!(someStruct, YAML)("data.yml");
- + --------------------
- + Returns: Data from the file in the format specified
- +/
-T fromFile(T, Format)(string path) {
-	import std.file : read;
-	return fromString!(T,Format)(cast(string)path.read());
-}
-/++
- + Reads serialized data from a file with automatic format detection based on filename
  +
- + Currently supports $(SUPPORTEDAUTOFORMATS).
- + Params:
- + T = Type stored in the file
- + path = Absolute or relative path to the file
- + Examples:
- + --------------------
- + auto anInteger = fromFile!uint("data.yml");
- + auto aString = fromFile!string("data.json");
- + auto aStruct = fromFile!someStruct("data.yml");
- + --------------------
  + Returns: Data from the file in the format specified
  +/
-T fromFile(T)(string path) {
-	import std.path;
-	switch(path.extension) {
-		case ".yml", ".yaml":
-			return fromFile!(T, YAML)(path);
-		case ".json":
-			return fromFile!(T, JSON)(path);
-		default:
-			throw new SerializeException("Unknown extension");
+T fromFile(T, Format = AutoDetect)(string path) {
+	static if (is(Format == AutoDetect)) {
+		import std.path;
+		switch(path.extension) {
+			case ".yml", ".yaml":
+				return fromFile!(T, YAML)(path);
+			case ".json":
+				return fromFile!(T, JSON)(path);
+			default:
+				throw new SerializeException("Unknown extension");
+		}
+	} else { //Not autodetecting
+		import std.file : read;
+		return fromString!(T,Format)(cast(string)path.read());
 	}
 }
+///
+unittest {
+	import std.stdio : File;
+	import std.path : exists;
+	import std.file : remove;
+	import std.exception : assertThrown;
+	struct testStruct {
+		string a;
+	}
+	//Write some example files...
+	File("int.yml", "w").write("---\n9");
+	File("string.json", "w").write(`"test"`);
+	File("struct.yml", "w").write("---\na: b");
+	scope(exit) { //Clean up when done
+		if ("int.yml".exists)
+			remove("int.yml");
+		if ("string.json".exists)
+			remove("string.json");
+		if ("struct.yml".exists)
+			remove("struct.yml");
+	}
+	//Read examples from respective files
+	assert(fromFile!(uint, YAML)("int.yml") == 9);
+	assert(fromFile!(string, JSON)("string.json") == "test");
+	assert(fromFile!(testStruct, YAML)("struct.yml") == testStruct("b"));
+	//Read examples from respective files using automatic format detection
+	assert(fromFile!uint("int.yml") == 9);
+	assert(fromFile!string("string.json") == "test");
+	assert(fromFile!testStruct("struct.yml") == testStruct("b"));
+
+
+	assertThrown("file.obviouslybadextension".fromFile!uint);
+}
 /++
- + Deserializes data from a UTF-8 encoded string in the given format.
+ + Deserializes data from a string.
  + 
+ + String is assumed to be UTF-8 encoded. If no format (or AutoDetect) is
+ + specified, an attempt at autodetction is made.
+ +
  + Params:
  + T = Type of the data to be deserialized
  + Format = Serialization format ($(SUPPORTEDFORMATS))
  + str = A string containing serialized data in the specified format
- + Examples:
- + --------------------
- + auto aStruct = fromString!(testStruct, JSON)(`{"a": "b"}`);
- + auto anotherStruct = fromString!(testStruct, YAML)("---\na: b");
- + assert(aStruct == anotherStruct);
- + --------------------
- + Returns: Data contained in the string
- +/
-T fromString(T, Format)(string str) {
-	return Format.parseString!T(str);
-}
-/++
- + Deserializes data from a UTF-8 encoded string with automatic format detection.
  +
- + Params:
- + T = Type of the data to be deserialized
- + str = A string containing serialized data in the specified format
- + Examples:
- + --------------------
- + auto aStruct = fromString!testStruct(`{"a": "b"}`);
- + auto anotherStruct = fromString!testStruct("---\na: b");
- + assert(aStruct == anotherStruct);
- + --------------------
+ + Supports $(SUPPORTEDSTRUCTURES).
+ + 
  + Returns: Data contained in the string
  +/
-T fromString(T)(string str) if (is(T == struct) && !isTimeType!T) {
-	if (str[0] == '{')
-		return fromString!(T, JSON)(str);
-	return fromString!(T, YAML)(str);
+T fromString(T, Format = AutoDetect)(string str) if (!is(Format == AutoDetect) || canAutomaticallyDeserializeString!T) {
+	static if (is(Format == AutoDetect)) {
+		static if (is(T == struct) || isAssociativeArray!T) {
+			if (str[0] == '{')
+				return fromString!(T, JSON)(str);
+			return fromString!(T, YAML)(str);
+		} else static if (isArray!T) {
+			if (str[0] == '[')
+				return fromString!(T, JSON)(str);
+			return fromString!(T, YAML)(str);
+		}
+	} else //Not autodetecting
+		return Format.parseString!T(str);
 }
+///
+unittest {
+	struct testStruct {
+		string a;
+	}
+	//Compare a struct serialized into two different formats
+	auto aStruct = fromString!(testStruct, JSON)(`{"a": "b"}`);
+	auto anotherStruct = fromString!(testStruct, YAML)("---\na: b");
+	assert(aStruct == anotherStruct);
 
+	//Compare a struct serialized into two different formats and auto-detect format
+	auto aStruct2 = fromString!testStruct(`{"a": "b"}`);
+	auto anotherStruct2 = fromString!testStruct("---\na: b");
+	assert(aStruct2 == anotherStruct2);
+}
 /++
- + Serializes data to a string in the specified format.
+ + Serializes data to a string.
  +
  + UTF-8 encoded by default.
+ +
+ + Supports $(SUPPORTEDSTRUCTURES).
+ + 
  + Params:
  + Format = Serialization format ($(SUPPORTEDFORMATS))
  + data = The data to be serialized
- + Examples:
- + --------------------
- + assert(3.asString!JSON == `3`);
- + assert("str".asString!JSON == `"str"`);
- + --------------------
+ +
  + Returns: A string in the specified format representing the user's data, UTF-8 encoded
  +/
-@property string asString(Format, T)(T data) {
+@property string toString(Format, T)(T data) {
 	return Format.asString(data);
 }
-/++
- + Writes serialized data to a file.
- +
- + Any format supported by this library may be specified.
- + For best results, stick to structs, built-in data types, Nullable and std.DateTime structs. 
- + Examples:
- + --------------------
- + 3.writeFile!YAML("data.yml");
- + "str".writeFile!JSON("data.json");
- + someStruct a; a.writeFile!YAML("data.yml");
- + --------------------
- +/
-void writeFile(Format, T)(T data, string path) {
-	import std.stdio : File;
-	File(path, "w").write(data.asString!Format);
+///
+unittest {
+	//3 as a JSON object
+	assert(3.toString!JSON == `3`);
+	//"str" as a JSON object
+	assert("str".toString!JSON == `"str"`);
 }
+///For cases where toString is already defined
+alias toFormattedString = toString;
 /++
- + Writes serialized data to a file with automatic format detection based on filename
+ + Serializes data to a file.
  +
- + Currently supports $(SUPPORTEDAUTOFORMATS).
+ + Any format supported by this library may be specified. If no format is
+ + specified, it will be chosen from the file extension if possible.
+ +
+ + Supports $(SUPPORTEDSTRUCTURES).
+ + 
+ + This function will NOT create directories as necessary.
+ +
  + Params:
- + data = Data to be serialized and stored
- + path = Absolute or relative path to the file
- + Examples:
- + --------------------
- + 3.writeFile("data.yml");
- + "str".writeFile("data.json");
- + someStruct a; a.writeFile("data.yml");
- + --------------------
+ + Format = Serialization format ($(SUPPORTEDFORMATS))
+ + data = The data to be serialized
+ + path = The path for the file to be written
  +/
-void writeFile(T)(T data, string path) {
-	import std.path;
-	switch(path.extension) {
-		case ".yml", ".yaml":
-			writeFile!YAML(data, path);
-			break;
-		case ".json":
-			writeFile!JSON(data, path);
-			break;
-		default:
-			throw new DeserializeException("Unknown extension");
+@property void toFile(Format = AutoDetect, T)(T data, string path) {
+	static if (is(Format == AutoDetect)) {
+		import std.path;
+		switch(path.extension) {
+			case ".yml", ".yaml":
+				data.toFile!YAML(path);
+				break;
+			case ".json":
+				data.toFile!JSON(path);
+				break;
+			default:
+				throw new DeserializeException("Unknown extension");
+		}
+	} else { //Not autodetecting
+		import std.stdio : File;
+		File(path, "w").write(data.toString!Format);
 	}
+}
+///
+unittest {
+	import std.file : remove;
+	import std.path : exists;
+	import std.exception : assertThrown;
+	struct testStruct {
+		string a;
+	}
+	scope(exit) { //Clean up when done
+		if ("int.yml".exists)
+			remove("int.yml");
+		if ("string.json".exists)
+			remove("string.json");
+		if ("struct.yml".exists)
+			remove("struct.yml");
+		if ("int-auto.yml".exists)
+			remove("int-auto.yml");
+		if ("string-auto.json".exists)
+			remove("string-auto.json");
+		if ("struct-auto.yml".exists)
+			remove("struct-auto.yml");
+	}
+	//Write the integer "3" to "int.yml"
+	3.toFile!YAML("int.yml");
+	//Write the string "str" to "string.json"
+	"str".toFile!JSON("string.json");
+	//Write a structure to "struct.yml"
+	testStruct("b").toFile!YAML("struct.yml");
+
+	//Check that contents are correct
+	assert("int.yml".fromFile!uint == 3);
+	assert("string.json".fromFile!string == "str");
+	assert("struct.yml".fromFile!testStruct == testStruct("b"));
+
+	//Write the integer "3" to "int-auto.yml", but detect format automatically
+	3.toFile("int-auto.yml");
+	//Write the string "str" to "string-auto.json", but detect format automatically
+	"str".toFile("string-auto.json");
+	//Write a structure to "struct-auto.yml", but detect format automatically
+	testStruct("b").toFile("struct-auto.yml");
+
+	//Check that contents are correct
+	assert("int-auto.yml".fromFile!uint == 3);
+	assert("string-auto.json".fromFile!string == "str");
+	assert("struct-auto.yml".fromFile!testStruct == testStruct("b"));
+
+	//Bad extension for auto-detection mechanism
+	assertThrown(3.toFile("file.obviouslybadextension"));
 }
 version(unittest) {
 	struct Test2 {
@@ -174,87 +246,25 @@ unittest {
 		char i;
 	}
 	void RunTest2(T, U)(T input, U expected) {
-		assert(input.asString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
-		assert(input.asString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
-		static if (__traits(compiles, fromString!U(""))) {
-			assert(input.asString!YAML.fromString!U == expected, "Automagic YAML Serialization of "~T.stringof~" failed");
-			assert(input.asString!JSON.fromString!U == expected, "Automagic JSON Serialization of "~T.stringof~" failed");
+		assert(input.toFormattedString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
+		assert(input.toFormattedString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
+		static if (canAutomaticallyDeserializeString!U) {
+			assert(input.toFormattedString!YAML.fromString!U == expected, "Automagic YAML Serialization of "~T.stringof~" failed");
+			assert(input.toFormattedString!JSON.fromString!U == expected, "Automagic JSON Serialization of "~T.stringof~" failed");
 		}
 	}
 	void RunTest(T)(T expected) {
 		RunTest2(expected, expected);
 	}
 	void runBadTest(T, U)(U value) {
-		assertThrown(value.asString!YAML.fromString!(T, YAML));
-		assertThrown(value.asString!JSON.fromString!(T, JSON));
+		assertThrown(value.toString!YAML.fromString!(T, YAML));
+		assertThrown(value.toString!JSON.fromString!(T, JSON));
 	}
 	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');
-	scope(exit) if ("test.json".exists) remove("test.json");
-	scope(exit) if ("test.yml".exists) remove("test.yml");
-	testInstance.writeFile("test.json");
-	testInstance.writeFile("test.yml");
-	assertThrown(testInstance.writeFile("test.blatantlyinvalidextension"));
-	assert(fromFile!(Test)("test.json") == testInstance);
-	assert(fromFile!(Test)("test.yml") == testInstance);
-	assertThrown(fromFile!Test("test.blatantlyinvalidextension"));
-
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": false,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
-	assert(`{"a": "beep","b": 2,"c": 4,"d": ["derp","blorp"],"e": {"one": 1,"two": 3},"f": null,"g": {"Test2":{"inner": "test"}}, "h": 4.5, "i": "g"}`.fromString!(Test,JSON) == testInstance);
-
-	assert(3.asString!JSON == `3`);
-	assert("str".asString!JSON == `"str"`);
-	
-	assert(`---
-a: beep
-b: 2
-c: 4
-d:
-- derp
-- blorp
-e:
-  two: 3
-  one: 1
-g:
-  Test2:
-    inner: test
-h: 4.5
-i: g`.fromString!(Test,YAML) == testInstance);
-	assert(`---
-a: beep
-b: 2
-c: 4
-d:
-- derp
-- blorp
-e:
-  two: 3
-  one: 1
-f: false
-g:
-  Test2:
-    inner: test
-h: 4.5
-i: g`.fromString!(Test,YAML) == testInstance);
-	assert(`---
-a: beep
-b: 2
-c: 4
-d:
-- derp
-- blorp
-e:
-  two: 3
-  one: 1
-f: ~
-g:
-  Test2:
-    inner: test
-h: 4.5
-i: g`.fromString!(Test,YAML) == testInstance);
 	
 	RunTest(testInstance);
-
+	RunTest(testInstance.d);
+	RunTest(testInstance.g);
 	struct stringCharTest {
 		char a;
 		wchar b;
@@ -294,8 +304,8 @@ i: g`.fromString!(Test,YAML) == testInstance);
 		Nullable!uint aNullable;
 		Nullable!(uint,0) anotherNullable;
 	}
-	auto resultYAML = testNull().asString!YAML.fromString!(testNull, YAML);
-	auto resultJSON = testNull().asString!JSON.fromString!(testNull, JSON);
+	auto resultYAML = testNull().toString!YAML.fromString!(testNull, YAML);
+	auto resultJSON = testNull().toString!JSON.fromString!(testNull, JSON);
 
 	assert(resultYAML.notNull == 0);
 	assert(resultJSON.notNull == 0);
@@ -316,8 +326,8 @@ i: g`.fromString!(Test,YAML) == testInstance);
 		@SiryulizeAs("word") string something;
 	}
 	RunTest(SiryulizeAsTest("a"));
-	assert(SiryulizeAsTest("a").asString!YAML.canFind("word"));
-	assert(SiryulizeAsTest("a").asString!JSON.canFind("word"));
+	assert(SiryulizeAsTest("a").toString!YAML.canFind("word"));
+	assert(SiryulizeAsTest("a").toString!JSON.canFind("word"));
 
 	struct testNull2 {
 		@Optional @SiryulizeAs("v") Nullable!bool value;
@@ -327,8 +337,8 @@ i: g`.fromString!(Test,YAML) == testInstance);
 	RunTest(testval);
 	testval.value = false;
 	RunTest(testval);
-	assert(testNull2().asString!YAML.fromString!(testNull2, YAML).value.isNull);
-	assert(testNull2().asString!JSON.fromString!(testNull2, JSON).value.isNull);
+	assert(testNull2().toString!YAML.fromString!(testNull2, YAML).value.isNull);
+	assert(testNull2().toString!JSON.fromString!(testNull2, JSON).value.isNull);
 	assert(`{}`.fromString!(testNull2, JSON).value.isNull);
 	assert(`---`.fromString!(testNull2, YAML).value.isNull);
 
@@ -357,6 +367,7 @@ class DeserializeException : SiryulException {
 enum Optional;
 enum AsString;
 enum AsBinary;
+enum AutoDetect;
 struct SiryulizeAs { string name; }
 
 template isNullable(T) {
@@ -365,13 +376,33 @@ template isNullable(T) {
 	else
 		enum isNullable = false;
 }
+static assert(isNullable!(Nullable!int));
+static assert(isNullable!(Nullable!(int, 0)));
+static assert(!isNullable!int);
+
 template isTimeType(T) {
 	import std.datetime;
 	enum isTimeType = is(T == DateTime) || is(T == SysTime) || is(T == TimeOfDay) || is(T == Date);
 }
-static assert(isNullable!(Nullable!int));
-static assert(isNullable!(Nullable!(int, 0)));
-static assert(!isNullable!int);
+private import std.datetime;
+static assert(isTimeType!DateTime);
+static assert(isTimeType!SysTime);
+static assert(isTimeType!Date);
+static assert(isTimeType!TimeOfDay);
+static assert(!isTimeType!string);
+static assert(!isTimeType!uint);
+static assert(!isTimeType!(DateTime[]));
+
+template canAutomaticallyDeserializeString(T) {
+	enum canAutomaticallyDeserializeString = (isArray!T && !isSomeString!T) || isAssociativeArray!T || (is(T == struct) && !isTimeType!T);
+}
+static assert(canAutomaticallyDeserializeString!(string[]));
+static assert(canAutomaticallyDeserializeString!(string[string]));
+private struct exampleStruct {}
+static assert(canAutomaticallyDeserializeString!(exampleStruct));
+static assert(!canAutomaticallyDeserializeString!string);
+static assert(!canAutomaticallyDeserializeString!uint);
+
 template getUDAValue(alias T, UDA) {
 	enum getUDAValue = () {
 		static assert(hasUDA!(T, UDA));
