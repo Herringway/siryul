@@ -234,6 +234,10 @@ version(unittest) {
 	import std.exception : assertThrown;
 	import std.file;
 	import std.datetime;
+	import std.meta : AliasSeq, Filter;
+	import std.traits : Fields;
+	alias siryulizers = Filter!(isSiryulizer, AliasSeq!(JSON, YAML));
+	static assert(siryulizers.length > 0);
 	struct Test {
 		string a;
 		uint b;
@@ -260,8 +264,8 @@ version(unittest) {
 		}
 	}
 	void RunTest2_Fail(T, U)(U value) @safe nothrow {
-		assertThrown(value.toString!YAML.fromString!(T, YAML));
-		assertThrown(value.toString!JSON.fromString!(T, JSON));
+		foreach (siryulizer; siryulizers)
+			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer));
 	}
 	void RunTest(T)(T expected) @safe {
 		RunTest2(expected, expected);
