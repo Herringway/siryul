@@ -228,7 +228,7 @@ version(unittest) {
 		string inner;
 	}
 }
-unittest {
+@safe unittest {
 	import std.stdio : writeln;
 	import std.algorithm : filter, canFind;
 	import std.exception : assertThrown;
@@ -245,27 +245,36 @@ unittest {
 		double h;
 		char i;
 	}
-	void RunTest2(T, U)(T input, U expected) {
-		assert(input.toFormattedString!YAML.fromString!(U, YAML) == expected, "YAML Serialization of "~T.stringof~" failed");
-		assert(input.toFormattedString!JSON.fromString!(U, JSON) == expected, "JSON Serialization of "~T.stringof~" failed");
-		static if (canAutomaticallyDeserializeString!U) {
-			assert(input.toFormattedString!YAML.fromString!U == expected, "Automagic YAML Serialization of "~T.stringof~" failed");
-			assert(input.toFormattedString!JSON.fromString!U == expected, "Automagic JSON Serialization of "~T.stringof~" failed");
+	void RunTest2(T, U)(T input, U expected) @safe {
+		import std.string : format;
+		foreach (siryulizer; siryulizers) {
+			assert(isSiryulizer!siryulizer);
+			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
+			string vals;
+			() @trusted {
+				vals = format("expected %s, got %s", expected, gotYAMLValue);
+			}();
+			assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+			static if (canAutomaticallyDeserializeString!U)
+				assert(input.toFormattedString!siryulizer.fromString!U == expected, "Automagic "~T.stringof~"->"~siryulizer.stringof~"->"~U.stringof~" failed");
 		}
 	}
-	void RunTest(T)(T expected) {
-		RunTest2(expected, expected);
-	}
-	void runBadTest(T, U)(U value) {
+	void RunTest2_Fail(T, U)(U value) @safe nothrow {
 		assertThrown(value.toString!YAML.fromString!(T, YAML));
 		assertThrown(value.toString!JSON.fromString!(T, JSON));
+	}
+	void RunTest(T)(T expected) @safe {
+		RunTest2(expected, expected);
+	}
+	void RunTest_Fail(T)(T expected) @safe {
+		RunTest2_Fail!T(expected);
 	}
 	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');
 	
 	RunTest(testInstance);
 	RunTest(testInstance.d);
 	RunTest(testInstance.g);
-	struct stringCharTest {
+	@safe struct stringCharTest {
 		char a;
 		wchar b;
 		dchar c;
@@ -290,13 +299,12 @@ unittest {
 
 	enum testEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
 	
-	assert(`3`.fromString!(testEnum,JSON) == testEnum.wont);
-	//assert(`3`.fromString!(testEnum,YAML) == testEnum.wont);
+	RunTest2(3, testEnum.wont);
 
 	RunTest2(testEnum.something, testEnum.something);
 	RunTest2(testEnum.something, "something");
 
-	struct testNull {
+	@safe struct testNull {
 		import std.typecons;
 		uint notNull;
 		string aString;
@@ -342,11 +350,19 @@ unittest {
 	assert(`{}`.fromString!(testNull2, JSON).value.isNull);
 	assert(`---`.fromString!(testNull2, YAML).value.isNull);
 
-	runBadTest!bool("b");
+	RunTest2_Fail!bool("b");
 	assert(`null`.fromString!(wstring, JSON) == "");
 	assert(`null`.fromString!(wstring, YAML) == "");
 	assert(`null`.fromString!(wchar, JSON) == wchar.init);
 	assert(`null`.fromString!(wchar, YAML) == wchar.init);
+
+	//Autoconversion tests
+	//string <-> int
+	RunTest2("3", 3);
+	RunTest2(3, "3");
+	//string <-> float
+	RunTest2("3.0", 3.0);
+	RunTest2(3.0, "3");
 }
 
 class SiryulException : Exception {
