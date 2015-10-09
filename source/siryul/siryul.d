@@ -418,17 +418,30 @@ private struct exampleStruct {}
 static assert(canAutomaticallyDeserializeString!(exampleStruct));
 static assert(!canAutomaticallyDeserializeString!string);
 static assert(!canAutomaticallyDeserializeString!uint);
-
 template getUDAValue(alias T, UDA) {
-	enum getUDAValue = () {
-		static assert(hasUDA!(T, UDA));
-		foreach(uda; __traits(getAttributes, T))
-			static if(is(typeof(uda) == UDA))
-				return uda;
-		assert(0);
-	}();
+	static if (__traits(compiles, getUDAs!T)) {
+		enum getUDAValue = getUDAs!(T, UDA)[0].value;
+	} else {
+		enum getUDAValue = () {
+			static assert(hasUDA!(T, UDA));
+			foreach(uda; __traits(getAttributes, T))
+				static if(is(typeof(uda) == UDA))
+					return uda;
+			assert(0);
+		}();
+	}
 }
 unittest {
 	@SiryulizeAs("a") string thinger;
 	static assert(getUDAValue!(thinger, SiryulizeAs).name == "a");
 }
+
+template isSiryulizer(T) {
+	enum isSiryulizer = __traits(compiles, () {
+		uint val = T.parseString!uint("");
+		string str = T.asString(3);
+	});
+}
+static assert(isSiryulizer!JSON);
+static assert(isSiryulizer!YAML);
+static assert(!isSiryulizer!uint);
