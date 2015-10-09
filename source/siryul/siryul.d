@@ -274,7 +274,7 @@ version(unittest) {
 	RunTest(testInstance);
 	RunTest(testInstance.d);
 	RunTest(testInstance.g);
-	@safe struct stringCharTest {
+	struct stringCharTest {
 		char a;
 		wchar b;
 		dchar c;
@@ -304,7 +304,7 @@ version(unittest) {
 	RunTest2(testEnum.something, testEnum.something);
 	RunTest2(testEnum.something, "something");
 
-	@safe struct testNull {
+	struct testNull {
 		import std.typecons;
 		uint notNull;
 		string aString;
@@ -312,19 +312,15 @@ version(unittest) {
 		Nullable!uint aNullable;
 		Nullable!(uint,0) anotherNullable;
 	}
-	auto resultYAML = testNull().toString!YAML.fromString!(testNull, YAML);
-	auto resultJSON = testNull().toString!JSON.fromString!(testNull, JSON);
+	foreach (siryulizer; siryulizers) {
+		auto result = testNull().toFormattedString!siryulizer.fromString!(testNull, siryulizer);
 
-	assert(resultYAML.notNull == 0);
-	assert(resultJSON.notNull == 0);
-	assert(resultYAML.aString == "");
-	assert(resultJSON.aString == "");
-	assert(resultYAML.emptyArray == []);
-	assert(resultJSON.emptyArray == []);
-	assert(resultYAML.aNullable.isNull());
-	assert(resultJSON.aNullable.isNull());
-	assert(resultYAML.anotherNullable.isNull());
-	assert(resultJSON.anotherNullable.isNull());
+		assert(result.notNull == 0);
+		assert(result.aString == "");
+		assert(result.emptyArray == []);
+		assert(result.aNullable.isNull());
+		assert(result.anotherNullable.isNull());
+	}
 	auto nullableTest2 = testNull(1, "a");
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
@@ -333,9 +329,11 @@ version(unittest) {
 	struct SiryulizeAsTest {
 		@SiryulizeAs("word") string something;
 	}
+	struct SiryulizeAsTest2 {
+		string word;
+	}
 	RunTest(SiryulizeAsTest("a"));
-	assert(SiryulizeAsTest("a").toString!YAML.canFind("word"));
-	assert(SiryulizeAsTest("a").toString!JSON.canFind("word"));
+	RunTest2(SiryulizeAsTest("a"), SiryulizeAsTest2("a"));
 
 	struct testNull2 {
 		@Optional @SiryulizeAs("v") Nullable!bool value;
@@ -345,16 +343,14 @@ version(unittest) {
 	RunTest(testval);
 	testval.value = false;
 	RunTest(testval);
-	assert(testNull2().toString!YAML.fromString!(testNull2, YAML).value.isNull);
-	assert(testNull2().toString!JSON.fromString!(testNull2, JSON).value.isNull);
+	foreach (siryulizer; siryulizers)
+		assert(testNull2().toString!siryulizer.fromString!(testNull2, siryulizer).value.isNull);
 	assert(`{}`.fromString!(testNull2, JSON).value.isNull);
 	assert(`---`.fromString!(testNull2, YAML).value.isNull);
 
 	RunTest2_Fail!bool("b");
-	assert(`null`.fromString!(wstring, JSON) == "");
-	assert(`null`.fromString!(wstring, YAML) == "");
-	assert(`null`.fromString!(wchar, JSON) == wchar.init);
-	assert(`null`.fromString!(wchar, YAML) == wchar.init);
+	RunTest2(Nullable!string.init, wstring.init);
+	RunTest2(Nullable!char.init, wchar.init);
 
 	//Autoconversion tests
 	//string <-> int
