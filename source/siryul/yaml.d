@@ -44,6 +44,7 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
 	import std.conv : to;
+	import std.meta : AliasSeq;
 	if (node.isNull)
 		return T.init;
 	try {
@@ -74,22 +75,20 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (member; FieldNameTuple!T) {
-				static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-					enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-						if (!node.containsKey(memberName))
-							continue;
-					} else
-						enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
+				string memberName = member;
+				static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
+					memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+					if (!node.containsKey(memberName))
+						continue;
+				} else
+					enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
+				static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
+					alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
+					assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
+					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0]));
+				} else 
 					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)));
-				} else {
-					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-						if (!node.containsKey(member))
-							continue;
-					} else
-						enforce(node.containsKey(member), new YAMLException("Missing non-@Optional "~member~" in node"));
-					__traits(getMember, output, member) = node[member].fromYAML!(typeof(__traits(getMember, T, member)));
-				}
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
@@ -122,6 +121,7 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 private @property Node toYAML(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
 	import std.conv : text;
+	import std.meta : AliasSeq;
 	static if (hasUDA!(type, AsString) || is(T == enum)) {
 		return Node(type.text);
 	} else static if (isNullable!T) {
@@ -156,11 +156,15 @@ private @property Node toYAML(T)(T type) @trusted if (!isInfinite!T) {
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-				output.add(memberName, __traits(getMember, type, member).toYAML);
+			string memberName = member;
+			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
+				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
+				alias toFunc = AliasSeq!(__traits(getMember, type, getUDAValue!(__traits(getMember, type, member), CustomParser).toFunc))[0];
+				assert(arity!toFunc == 1, "Arity of conversion function must be exactly 1");
+				output.add(memberName, toFunc(__traits(getMember, type, member)).toYAML);
 			} else
-				output.add(member, __traits(getMember, type, member).toYAML);
+				output.add(memberName, __traits(getMember, type, member).toYAML);
 		}
 		return output;
 	} else

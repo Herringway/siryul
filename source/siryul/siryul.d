@@ -363,6 +363,22 @@ version(unittest) {
 	//string <-> float
 	RunTest2("3.0", 3.0);
 	RunTest2(3.0, "3");
+
+	//Custom parser
+	struct timeTest {
+		@CustomParser("fromJunk", "toJunk") SysTime time;
+		static SysTime fromJunk(string str) {
+			return SysTime(DateTime(2015,10,07,15,04,46),UTC());
+		}
+		static string toJunk(SysTime input) {
+			return "this has nothing to do with time.";
+		}
+	}
+	struct timeTestString {
+		string time;
+	}
+	RunTest2(timeTest(SysTime(DateTime(2015,10,07,15,04,46),UTC())), timeTestString("this has nothing to do with time."));
+	RunTest2(timeTestString("this has nothing to do with time."), timeTest(SysTime(DateTime(2015,10,07,15,04,46),UTC())));
 }
 
 class SiryulException : Exception {
@@ -385,6 +401,7 @@ enum AsString;
 enum AsBinary;
 enum AutoDetect;
 struct SiryulizeAs { string name; }
+struct CustomParser { string fromFunc; string toFunc; }
 
 template isNullable(T) {
 	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))

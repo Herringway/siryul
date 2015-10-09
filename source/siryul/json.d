@@ -22,6 +22,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	import std.traits, std.exception, std.datetime, std.range, std.conv;
 	import std.range.primitives : ElementType;
 	import std.conv : to;
+	import std.meta : AliasSeq;
 	static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
@@ -63,22 +64,21 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		enforce(node.type == JSON_TYPE.OBJECT, new JSONException("Expecting object, got "~node.type.text));
 		T output;
 		foreach (member; FieldNameTuple!T) {
+			string memberName = member;
 			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
-						continue;
-				} else
-					enforce(memberName in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
-				__traits(getMember, output, member) = fromJSON!(typeof(__traits(getMember, T, member)))(node[memberName]);
-			} else {
-				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if ((member !in node.object) || (node.object[member].type == JSON_TYPE.NULL))
-						continue;
-				} else
-					enforce(member in node.object, new JSONException("Missing non-@Optional "~member~" in node"));
-				__traits(getMember, output, member) = fromJSON!(typeof(__traits(getMember, T, member)))(node[member]);
+				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
 			}
+			static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
+					continue;
+			} else
+				enforce(memberName in node.object, new JSONException("Missing non-@Optional "~memberName~" in node"));
+			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
+				alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
+				assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
+				__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0]));
+			} else 
+				__traits(getMember, output, member) = fromJSON!(typeof(__traits(getMember, T, member)))(node[memberName]);
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
@@ -113,6 +113,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 private @property JSONValue toJSON(T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits, std.datetime, std.range;
 	import std.conv : text;
+	import std.meta : AliasSeq;
 	JSONValue output;
 	static if (hasUDA!(type, AsString) || is(T == enum)) {
 		output = JSONValue(type.text);
@@ -144,11 +145,15 @@ private @property JSONValue toJSON(T)(T type) @trusted if (!isInfinite!T) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-				enum memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+			string memberName = member;
+			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
+				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
+				alias toFunc = AliasSeq!(__traits(getMember, type, getUDAValue!(__traits(getMember, type, member), CustomParser).toFunc))[0];
+				assert(arity!toFunc == 1, "Arity of conversion function must be exactly 1");
+				output.object[memberName] = toFunc(__traits(getMember, type, member)).toJSON;
+			} else
 				output.object[memberName] = __traits(getMember, type, member).toJSON;
-			} else 
-				output.object[member] = __traits(getMember, type, member).toJSON;
 		}
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
