@@ -32,7 +32,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	} else static if (isIntegral!T) {
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		enforce(node.type == JSON_TYPE.INTEGER, new JSONException("Expecting integer, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.INTEGER, new UnexpectedTypeException(JSON_TYPE.INTEGER, node.type));
 		return node.integer.to!T;
 	} else static if (isNullable!T) {
 		T output;
@@ -44,7 +44,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 	} else static if (isFloatingPoint!T) {
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		enforce(node.type == JSON_TYPE.FLOAT, new JSONException("Expecting floating point, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.FLOAT, new UnexpectedTypeException(JSON_TYPE.FLOAT, node.type));
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
 		if (node.type == JSON_TYPE.INTEGER)
@@ -53,7 +53,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 			return T.init;
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
-		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new JSONException("Expecting string, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new UnexpectedTypeException(JSON_TYPE.STRING, node.type));
 		if (node.type == JSON_TYPE.NULL)
 			return T.init;
 		return node.str.front.to!T;
@@ -61,7 +61,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		enforce(node.type == JSON_TYPE.STRING, new JSONException("Expecting timestamp string, got "~node.type.text));
 		return T.fromISOExtString(node.str);
 	} else static if (is(T == struct)) {
-		enforce(node.type == JSON_TYPE.OBJECT, new JSONException("Expecting object, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.OBJECT, new UnexpectedTypeException(JSON_TYPE.OBJECT, node.type));
 		T output;
 		foreach (member; FieldNameTuple!T) {
 			string memberName = member;
@@ -72,7 +72,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
 					continue;
 			} else
-				enforce(memberName in node.object, new JSONException("Missing non-@Optional "~memberName~" in node"));
+				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
 			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
 				alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
 				assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
@@ -82,20 +82,21 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
-		enforce(node.type == JSON_TYPE.ARRAY, new JSONException("Expecting array, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.ARRAY, new UnexpectedTypeException(JSON_TYPE.ARRAY, node.type));
 		T output;
 		foreach (JSONValue newNode; node.array)
 			output ~= fromJSON!(ElementType!T)(newNode);
 		return output;
 	} else static if(isStaticArray!T) {
-		enforce(node.type == JSON_TYPE.ARRAY, new JSONException("Expecting array, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.ARRAY, new UnexpectedTypeException(JSON_TYPE.ARRAY, node.type));
+		enforce(node.array.length == T.length, new JSONDException("Static array length mismatch"));
 		T output;
 		size_t i;
 		foreach (JSONValue newNode; node.array)
 			output[i++] = fromJSON!(ElementType!T)(newNode);
 		return output;
 	} else static if(isAssociativeArray!T) {
-		enforce(node.type == JSON_TYPE.OBJECT, new JSONException("Expecting object, got "~node.type.text));
+		enforce(node.type == JSON_TYPE.OBJECT, new UnexpectedTypeException(JSON_TYPE.OBJECT, node.type));
 		T output;
 		foreach (string key, JSONValue value; node.object)
 			output[key] = fromJSON!(ValueType!T)(value);
@@ -105,7 +106,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 			return true;
 		else if (node.type == JSON_TYPE.FALSE)
 			return false;
-		throw new JSONException("Expecting true/false, got "~node.type.text);
+		throw new JSONDException("Expecting true/false, got "~node.type.text);
 	} else
 		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
@@ -159,8 +160,31 @@ private @property JSONValue toJSON(T)(T type) @trusted if (!isInfinite!T) {
 		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
 	return output;
 }
-class JSONException : DeserializeException {
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+/++
+ + Thrown on JSON deserialization errors
+ +/
+class JSONDException : DeserializeException {
+	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		super(msg, file, line);
+	}
+}
+class UnexpectedTypeException : JSONDException {
+	package this(JSON_TYPE expectedType, JSON_TYPE unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		import std.conv : text;
+		string str;
+		try {
+			str = "Expecting JSON type "~expectedType.text~", got "~unexpectedType.text;
+		} catch (Exception) {
+			str = "Bad JSON type";
+		}
+		super(str, file, line);
+	}
+}
+/++
+ + Thrown on JSON serialization errors
+ +/
+class JSONSException : DeserializeException {
+	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
 }

@@ -35,8 +35,19 @@ struct YAML {
 		output ~= line.dup~"\n";
 	return output;
 }
-class YAMLException : DeserializeException {
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+/++
+ + Thrown on YAML deserialization errors
+ +/
+class YAMLDException : DeserializeException {
+	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		super(msg, file, line);
+	}
+}
+/++
+ + Thrown on YAML serialization errors
+ +/
+class YAMLSException : SerializeException {
+	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
 }
