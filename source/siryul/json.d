@@ -107,7 +107,7 @@ private T fromJSON(T)(JSONValue node) @trusted if (!isInfinite!T) {
 			return false;
 		throw new JSONException("Expecting true/false, got "~node.type.text);
 	} else
-		static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
+		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
 
 private @property JSONValue toJSON(T)(T type) @trusted if (!isInfinite!T) {
@@ -156,7 +156,7 @@ private @property JSONValue toJSON(T)(T type) @trusted if (!isInfinite!T) {
 				output.object[memberName] = __traits(getMember, type, member).toJSON;
 		}
 	} else
-		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
+		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
 	return output;
 }
 class JSONException : DeserializeException {
