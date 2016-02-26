@@ -75,7 +75,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 				return node.fromYAML!(OriginalType!T, flags).to!T;
 		} else static if (isNullable!T) {
 			T output;
-			auto val = node.get!(TemplateArgsOf!T[0]);
+			auto val = node.fromYAML!(TemplateArgsOf!T[0], flags);
 			static if (isNullableValue!T) {
 				output = val;
 			} else {
