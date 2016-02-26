@@ -4,9 +4,18 @@
 	"copyright": "Copyright © 2015, Cameron",
 	"authors": ["Cameron \"Herringway\" Ross"],
 	"license": "BSL-1.0",
-	"targetType": "library",
 	"homepage": "https://github.com/Herringway/siryul",
-	"dependencies": {
-		"dyaml": "~>0.5.3"
-	}
+	"configurations": [
+		{
+			"name": "with-yaml",
+			"targetType": "library",
+			"dependencies": {
+				"dyaml": "~>0.5.2"
+			}
+		},
+		{
+			"name": "no-yaml",
+			"targetType": "library"
+		}
+	]
 }
