@@ -1,19 +1,25 @@
 module siryul.yaml;
-import yaml;
-import siryul;
-import std.range.primitives : isInfinite;
-import std.stream : MemoryStream, SeekPos;
-import std.typecons;
+private import siryul;
+version(Have_dyaml) {
+import dyaml;
+private import std.range.primitives : isInfinite, isInputRange, ElementType;
+private import std.stream : MemoryStream, SeekPos;
+private import std.typecons;
+private import std.traits : isSomeChar;
 
 /++
  + YAML (YAML Ain't Markup Language) serialization format
  +/
 struct YAML {
-	static T parseString(T)(string data) @safe {
-		auto loader = Loader.fromString(data.dup).load();
-		return loader.fromYAML!T;
+	private import std.meta : AliasSeq;
+	package alias types = AliasSeq!(".yml", ".yaml");
+	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
+		import std.utf : byChar;
+		import std.conv : to;
+		auto loader = Loader.fromString(data.byChar.to!(char[])).load();
+		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
 	}
-	static string asString(T)(T data) @safe {
+	package static string asString(Siryulize flags, T)(T data) @safe {
 		MemoryStream stream;
 		() @trusted {
 			stream = new MemoryStream();
@@ -24,11 +30,11 @@ struct YAML {
 		representer.defaultScalarStyle = ScalarStyle.Plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
-		dumper.dump(data.toYAML());
+		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags))());
 		return stream.toStr;
 	}
 }
-@property string toStr(MemoryStream stream) @trusted {
+private @property string toStr(MemoryStream stream) @trusted {
 	string output;
 	stream.seek(0, SeekPos.Set);
 	foreach (char[] line; stream)
@@ -51,9 +57,11 @@ class YAMLSException : SerializeException {
 		super(msg, file, line);
 	}
 }
-private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
-	import std.traits, std.exception, std.datetime, std.range, std.conv;
-	import std.range.primitives : ElementType;
+private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfinite!T) {
+	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
+	import std.exception : enforce;
+	import std.datetime : SysTime, Date, DateTime, TimeOfDay;
+	import std.range : isOutputRange;
 	import std.conv : to;
 	import std.meta : AliasSeq;
 	if (node.isNull)
@@ -64,9 +72,17 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			else
-				return node.fromYAML!(OriginalType!T).to!T;
+				return node.fromYAML!(OriginalType!T, flags).to!T;
 		} else static if (isNullable!T) {
-			T output = node.get!(TemplateArgsOf!T[0]);
+			T output;
+			auto val = node.get!(TemplateArgsOf!T[0]);
+			static if (isNullableValue!T) {
+				output = val;
+			} else {
+				() @trusted {
+					output.bind(moveToHeap(val));
+				}();
+			}
 			return output;
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
@@ -97,29 +113,29 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 				static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
 					alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
 					assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0]));
-				} else 
-					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)));
+					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+				} else
+					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)), flags);
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
 			T output;
 			foreach (Node newNode; node)
-				output ~= fromYAML!(ElementType!T)(newNode);
+				output ~= fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if(isStaticArray!T) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
 			T output;
 			size_t i;
 			foreach (Node newNode; node)
-				output[i++] = fromYAML!(ElementType!T)(newNode);
+				output[i++] = fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if(isAssociativeArray!T) {
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (Node key, Node value; node)
-				output[fromYAML!(KeyType!T)(key)] = fromYAML!(ValueType!T)(value);
+				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);
 			return output;
 		} else static if (is(T == bool)) {
 			return node.get!T;
@@ -129,17 +145,19 @@ private T fromYAML(T)(Node node) @safe if (!isInfinite!T) {
 		throw new YAMLException(e.msg);
 	}
 }
-private @property Node toYAML(T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits, std.datetime, std.range;
+private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
+	import std.traits;
+	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
+	import std.range : isInputRange;
 	import std.conv : text;
 	import std.meta : AliasSeq;
 	static if (hasUDA!(type, AsString) || is(T == enum)) {
 		return Node(type.text);
 	} else static if (isNullable!T) {
-		if (type.isNull)
+		if (type.isNull && !(flags & Siryulize.omitNulls))
 			return Node(YAMLNull());
 		else
-			return type.get().toYAML;
+			return type.get().toYAML!flags;
 	} else static if (is(T == SysTime)) {
 		return Node(type, "tag:yaml.org,2002:timestamp");
 	} else static if (is(T == DateTime) || is(T == Date)) {
@@ -147,37 +165,56 @@ private @property Node toYAML(T)(T type) @trusted if (!isInfinite!T) {
 	} else static if (is(T == TimeOfDay)) {
 		return Node(type.toISOExtString());
 	} else static if (isSomeChar!T) {
-		return [type].toYAML;
+		return [type].toYAML!flags;
 	} else static if (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string)) {
 		return Node(type);
 	} else static if (isSomeString!T) {
-		import std.utf;
-		return type.toUTF8().idup.toYAML;
+		import std.utf : toUTF8;
+		return type.toUTF8().idup.toYAML!flags;
 	} else static if(isAssociativeArray!T) {
 		Node[Node] output;
 		foreach (key, value; type)
-			output[key.toYAML] = value.toYAML;
+			output[key.toYAML!flags] = value.toYAML!flags;
 		return Node(output);
 	} else static if(isInputRange!T || (isArray!T && !isSomeString!T)) {
 		Node[] output;
 		foreach (value; type)
-			output ~= value.toYAML;
+			output ~= value.toYAML!flags;
 		return Node(output);
 	} else static if (is(T == struct)) {
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
+			static if (!!(flags & Siryulize.omitInits)) {
+				static if (isNullable!(__traits(getMember, type, member))) {
+					if (__traits(getMember, type, member).isNull)
+						continue;
+				} else if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
+					continue;
+			}
 			string memberName = member;
 			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
 				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
 			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
 				alias toFunc = AliasSeq!(__traits(getMember, type, getUDAValue!(__traits(getMember, type, member), CustomParser).toFunc))[0];
 				assert(arity!toFunc == 1, "Arity of conversion function must be exactly 1");
-				output.add(memberName, toFunc(__traits(getMember, type, member)).toYAML);
+				output.add(memberName, toFunc(__traits(getMember, type, member)).toYAML!flags);
 			} else
-				output.add(memberName, __traits(getMember, type, member).toYAML);
+				output.add(memberName, __traits(getMember, type, member).toYAML!flags);
 		}
 		return output;
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
+}
+} else {
+	struct YAML {
+		private import std.meta : AliasSeq;
+		package alias types = AliasSeq!();
+		package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
+			assert(0, "YAML Unavailable");
+		}
+		package static string asString(Siryulize flags, T)(T data) @safe {
+			assert(0, "YAML Unavailable");
+		}
+	}
 }
