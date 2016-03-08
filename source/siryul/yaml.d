@@ -146,9 +146,8 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 	}
 }
 private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits;
+	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
-	import std.range : isInputRange;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
 	alias Undecorated = Unqual!T;
@@ -167,7 +166,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 		return Node(type.toISOExtString());
 	} else static if (isSomeChar!Undecorated) {
 		return [type].toYAML!flags;
-	} else static if (isIntegral!Undecorated || is(Undecorated == bool) || isFloatingPoint!Undecorated || is(Undecorated == string)) {
+	} else static if (canStoreUnchanged!Undecorated) {
 		return Node(type.to!Undecorated);
 	} else static if (isSomeString!Undecorated) {
 		import std.utf : toUTF8;
@@ -177,7 +176,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 		foreach (key, value; type)
 			output[key.toYAML!flags] = value.toYAML!flags;
 		return Node(output);
-	} else static if(isInputRange!Undecorated || (isArray!Undecorated && !isSomeString!Undecorated)) {
+	} else static if(isSimpleList!Undecorated) {
 		Node[] output;
 		foreach (value; type)
 			output ~= value.toYAML!flags;
@@ -206,6 +205,10 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 		return output;
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
+}
+private template canStoreUnchanged(T) {
+	import std.traits : isIntegral, isFloatingPoint;
+	enum canStoreUnchanged = isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string);
 }
 } else {
 	struct YAML {

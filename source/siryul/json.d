@@ -126,8 +126,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 }
 
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : isIntegral, isAssociativeArray, isArray, isFloatingPoint, isSomeString, isSomeChar, FieldNameTuple, hasUDA, arity, Unqual;
-	import std.datetime : DateTime, Date, TimeOfDay, SysTime;
+	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, arity, Unqual;
 	import std.range : isInputRange;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
@@ -140,9 +139,9 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 			output = JSONValue();
 		else
 			output = type.get().toJSON!flags;
-	} else static if (is(Undecorated == SysTime) || is(Undecorated == DateTime) || is(Undecorated == Date) || is(Undecorated == TimeOfDay)) {
+	} else static if (isTimeType!Undecorated) {
 		output = JSONValue(type.toISOExtString());
-	} else static if (isIntegral!Undecorated || is(Undecorated == string) || is(Undecorated == bool) || isFloatingPoint!Undecorated) {
+	} else static if (canStoreUnchanged!Undecorated) {
 		output = JSONValue(type.to!Undecorated);
 	} else static if (isSomeString!Undecorated) {
 		import std.utf : toUTF8;
@@ -154,7 +153,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 		output = JSONValue(arr);
 		foreach (key, value; type)
 			output.object[key.text] = value.toJSON!flags;
-	} else static if(isInputRange!Undecorated || isArray!Undecorated) {
+	} else static if (isSimpleList!Undecorated) {
 		string[] arr;
 		output = JSONValue(arr);
 		foreach (value; type)
@@ -184,6 +183,14 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
 	return output;
+}
+private template isTimeType(T) {
+	import std.datetime : DateTime, Date, TimeOfDay, SysTime;
+	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
+}
+private template canStoreUnchanged(T) {
+	import std.traits : isFloatingPoint, isIntegral;
+	enum canStoreUnchanged = isIntegral!T || is(T == string) || is(T == bool) || isFloatingPoint!T;
 }
 /++
  + Thrown on JSON deserialization errors

@@ -563,3 +563,8 @@ T* moveToHeap(T)(ref T value) {
     moveEmplace(value, *ptr);
     return ptr;
 }
+package template isSimpleList(T) {
+	import std.traits : isSomeString, isArray;
+	import std.range : isInputRange;
+	enum isSimpleList = isInputRange!T || (isArray!T && !isSomeString!T);
+}
