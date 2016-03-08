@@ -250,23 +250,25 @@ version(unittest) {
 		double h;
 		char i;
 	}
-	void runTest2(T, U)(T input, U expected) @trusted {
+	alias SkipImmutable = Flag!"SkipImmutable";
+	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(T input, U expected) @trusted {
 		import std.string : format;
 		import std.conv : to;
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
-			//auto immutableTest = (cast(immutable(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
-			//auto constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+			static if (flag == SkipImmutable.no) {
+				auto immutableTest = (cast(immutable(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+				auto constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+			}
 			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
-			string vals, valsOmit;
-			() @trusted {
-				vals = format("expected %s, got %s", expected, gotYAMLValue);
-				valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
-			}();
+			auto vals = format("expected %s, got %s", expected, gotYAMLValue);
+			auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
 			assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-			//assert(constTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-			//assert(immutableTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+			static if (flag == SkipImmutable.no) {
+				assert(constTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				assert(immutableTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+			}
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 			static if (canAutomaticallyDeserializeString!U)
 				assert(input.toFormattedString!siryulizer.fromString!U == expected, "Automagic "~T.stringof~"->"~siryulizer.stringof~"->"~U.stringof~" failed");
@@ -309,7 +311,7 @@ version(unittest) {
 	runTest(DateTime(2000, 01, 01, 01, 01, 01));
 	runTest(SysTime(DateTime(2000, 01, 01), UTC()));
 
-	runTest2([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
+	runTest2!(SkipImmutable.yes)([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
 	enum TestEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
 
@@ -369,8 +371,8 @@ version(unittest) {
 	assert(`---`.fromString!(TestNull2, YAML).value.isNull);
 
 	runTest2Fail!bool("b");
-	runTest2(Nullable!string.init, wstring.init);
-	runTest2(Nullable!char.init, wchar.init);
+	runTest2!(SkipImmutable.yes)(Nullable!string.init, wstring.init);
+	runTest2!(SkipImmutable.yes)(Nullable!char.init, wchar.init);
 
 	//Autoconversion tests
 	//string <-> int

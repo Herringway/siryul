@@ -126,39 +126,40 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 }
 
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : isIntegral, isAssociativeArray, isArray, isFloatingPoint, isSomeString, isSomeChar, FieldNameTuple, hasUDA, arity;
+	import std.traits : isIntegral, isAssociativeArray, isArray, isFloatingPoint, isSomeString, isSomeChar, FieldNameTuple, hasUDA, arity, Unqual;
 	import std.datetime : DateTime, Date, TimeOfDay, SysTime;
 	import std.range : isInputRange;
-	import std.conv : text;
+	import std.conv : text, to;
 	import std.meta : AliasSeq;
 	JSONValue output;
-	static if (hasUDA!(type, AsString) || is(T == enum)) {
+	alias Undecorated = Unqual!T;
+	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		output = JSONValue(type.text);
-	} else static if (isNullable!T) {
+	} else static if (isNullable!Undecorated) {
 		if (type.isNull && !(flags & Siryulize.omitNulls))
 			output = JSONValue();
 		else
 			output = type.get().toJSON!flags;
-	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
+	} else static if (is(Undecorated == SysTime) || is(Undecorated == DateTime) || is(Undecorated == Date) || is(Undecorated == TimeOfDay)) {
 		output = JSONValue(type.toISOExtString());
-	} else static if (isIntegral!T || is(T == string) || is(T == bool) || isFloatingPoint!T) {
-		output = JSONValue(type);
-	} else static if (isSomeString!T) {
+	} else static if (isIntegral!Undecorated || is(Undecorated == string) || is(Undecorated == bool) || isFloatingPoint!Undecorated) {
+		output = JSONValue(type.to!Undecorated);
+	} else static if (isSomeString!Undecorated) {
 		import std.utf : toUTF8;
 		output = JSONValue(type.toUTF8);
-	} else static if (isSomeChar!T) {
+	} else static if (isSomeChar!Undecorated) {
 		output = [type].idup.toJSON!flags;
-	} else static if (isAssociativeArray!T) {
+	} else static if (isAssociativeArray!Undecorated) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (key, value; type)
 			output.object[key.text] = value.toJSON!flags;
-	} else static if(isInputRange!T || isArray!T) {
+	} else static if(isInputRange!Undecorated || isArray!Undecorated) {
 		string[] arr;
 		output = JSONValue(arr);
 		foreach (value; type)
 			output.array ~= value.toJSON!flags;
-	} else static if (is(T == struct)) {
+	} else static if (is(Undecorated == struct)) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {

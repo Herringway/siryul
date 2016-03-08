@@ -149,39 +149,40 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 	import std.traits;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.range : isInputRange;
-	import std.conv : text;
+	import std.conv : text, to;
 	import std.meta : AliasSeq;
-	static if (hasUDA!(type, AsString) || is(T == enum)) {
+	alias Undecorated = Unqual!T;
+	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		return Node(type.text);
-	} else static if (isNullable!T) {
+	} else static if (isNullable!Undecorated) {
 		if (type.isNull && !(flags & Siryulize.omitNulls))
 			return Node(YAMLNull());
 		else
 			return type.get().toYAML!flags;
-	} else static if (is(T == SysTime)) {
-		return Node(type, "tag:yaml.org,2002:timestamp");
-	} else static if (is(T == DateTime) || is(T == Date)) {
+	} else static if (is(Undecorated == SysTime)) {
+		return Node(type.to!Undecorated, "tag:yaml.org,2002:timestamp");
+	} else static if (is(Undecorated == DateTime) || is(Undecorated == Date)) {
 		return Node(type.toISOExtString(), "tag:yaml.org,2002:timestamp");
-	} else static if (is(T == TimeOfDay)) {
+	} else static if (is(Undecorated == TimeOfDay)) {
 		return Node(type.toISOExtString());
-	} else static if (isSomeChar!T) {
+	} else static if (isSomeChar!Undecorated) {
 		return [type].toYAML!flags;
-	} else static if (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string)) {
-		return Node(type);
-	} else static if (isSomeString!T) {
+	} else static if (isIntegral!Undecorated || is(Undecorated == bool) || isFloatingPoint!Undecorated || is(Undecorated == string)) {
+		return Node(type.to!Undecorated);
+	} else static if (isSomeString!Undecorated) {
 		import std.utf : toUTF8;
 		return type.toUTF8().idup.toYAML!flags;
-	} else static if(isAssociativeArray!T) {
+	} else static if(isAssociativeArray!Undecorated) {
 		Node[Node] output;
 		foreach (key, value; type)
 			output[key.toYAML!flags] = value.toYAML!flags;
 		return Node(output);
-	} else static if(isInputRange!T || (isArray!T && !isSomeString!T)) {
+	} else static if(isInputRange!Undecorated || (isArray!Undecorated && !isSomeString!Undecorated)) {
 		Node[] output;
 		foreach (value; type)
 			output ~= value.toYAML!flags;
 		return Node(output);
-	} else static if (is(T == struct)) {
+	} else static if (is(Undecorated == struct)) {
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
