@@ -1,7 +1,7 @@
 module siryul.yaml;
 private import siryul;
 version(Have_dyaml) {
-import dyaml;
+import yaml;
 private import std.range.primitives : isInfinite, isInputRange, ElementType;
 private import std.stream : MemoryStream, SeekPos;
 private import std.typecons;
