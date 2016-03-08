@@ -13,6 +13,7 @@ private import std.traits : isSomeChar;
 struct YAML {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!(".yml", ".yaml");
+	enum emptyObject = "---\n...";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.utf : byChar;
 		import std.conv : to;

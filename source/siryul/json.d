@@ -12,6 +12,7 @@ private import std.traits : isSomeChar;
 struct JSON {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!".json";
+	enum emptyObject = "{}";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags));
 	}

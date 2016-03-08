@@ -365,10 +365,10 @@ version(unittest) {
 	runTest(testval);
 	testval.value = false;
 	runTest(testval);
-	foreach (siryulizer; siryulizers)
+	foreach (siryulizer; siryulizers) {
 		assert(TestNull2().toString!siryulizer.fromString!(TestNull2, siryulizer).value.isNull);
-	assert(`{}`.fromString!(TestNull2, JSON).value.isNull);
-	assert(`---`.fromString!(TestNull2, YAML).value.isNull);
+		assert(siryulizer.emptyObject.fromString!(TestNull2, siryulizer).value.isNull);
+	}
 
 	runTest2Fail!bool("b");
 	runTest2!(SkipImmutable.yes)(Nullable!string.init, wstring.init);
