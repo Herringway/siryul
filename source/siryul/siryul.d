@@ -73,7 +73,6 @@ unittest {
 	assert(fromFile!string("string.json") == "test");
 	assert(fromFile!TestStruct("struct.yml") == TestStruct("b"));
 
-
 	assertThrown("file.obviouslybadextension".fromFile!uint);
 }
 /++
@@ -215,6 +214,46 @@ version(unittest) {
 	struct Test2 {
 		string inner;
 	}
+	enum TestEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
+	struct TestNull {
+		import std.typecons : Nullable, NullableRef;
+		uint notNull;
+		string aString;
+		uint[] emptyArray;
+		Nullable!uint aNullable;
+		Nullable!(uint,0) anotherNullable;
+		Nullable!SysTime noDate;
+		Nullable!TestEnum noEnum;
+		NullableRef!uint nothingRef;
+		void toString(scope void delegate(const(char)[]) @safe sink) @safe const {
+			import std.format : formattedWrite;
+			sink("TestNull(");
+			formattedWrite(sink, "%s, ", notNull);
+			formattedWrite(sink, "%s, ", aString);
+			formattedWrite(sink, "%s, ", emptyArray);
+			if (aNullable.isNull)
+				sink("null, ");
+			else
+				formattedWrite(sink, "%s, ", aNullable.get);
+			if (anotherNullable.isNull)
+				sink("null, ");
+			else
+				formattedWrite(sink, "%s, ", anotherNullable.get);
+			if (noDate.isNull)
+				sink("null, ");
+			else
+				formattedWrite(sink, "%s, ", noDate.get);
+			if (noEnum.isNull)
+				sink("null, ");
+			else
+				formattedWrite(sink, "%s, ", noEnum.get);
+			if (nothingRef.isNull)
+				sink("null, ");
+			else
+				formattedWrite(sink, "%s, ", nothingRef.get);
+			sink(")");
+		}
+	}
 }
 @safe unittest {
 	import std.stdio : writeln;
@@ -236,23 +275,32 @@ version(unittest) {
 		char i;
 	}
 	alias SkipImmutable = Flag!"SkipImmutable";
-	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(T input, U expected) @trusted {
+	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(T input, U expected) @safe {
 		import std.string : format;
 		import std.conv : to;
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
-			static if (flag == SkipImmutable.no) {
-				auto immutableTest = (cast(immutable(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
-				auto constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
-			}
 			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
+			static if (flag == SkipImmutable.no) {
+				///Awkward workaround to avoid immutable/const casts in @safe.
+				auto result = () @trusted {
+					return tuple(cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer),
+					(cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer),
+					cast(immutable)expected,
+					cast(const)expected);
+				}();
+				immutable immutableTest = result[0];
+				immutable immutableExpected = result[2];
+				const constTest = result[1];
+				const constExpected = result[3];
+			}
 			auto vals = format("expected %s, got %s", expected, gotYAMLValue);
 			auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
 			assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
 			static if (flag == SkipImmutable.no) {
-				assert(constTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				assert(immutableTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				assert(constTest == constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				assert(immutableTest == immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
 			}
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 		}
@@ -296,23 +344,12 @@ version(unittest) {
 
 	runTest2!(SkipImmutable.yes)([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
-	enum TestEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
 
 	runTest2(3, TestEnum.wont);
 
 	runTest2(TestEnum.something, TestEnum.something);
 	runTest2(TestEnum.something, "something");
 
-	struct TestNull {
-		import std.typecons : Nullable, NullableRef;
-		uint notNull;
-		string aString;
-		uint[] emptyArray;
-		Nullable!uint aNullable;
-		Nullable!(uint,0) anotherNullable;
-		Nullable!SysTime noDate;
-		NullableRef!uint nothingRef;
-	}
 	foreach (siryulizer; siryulizers) {
 		auto result = TestNull().toFormattedString!siryulizer.fromString!(TestNull, siryulizer);
 
@@ -322,12 +359,14 @@ version(unittest) {
 		assert(result.aNullable.isNull());
 		assert(result.anotherNullable.isNull());
 		assert(result.noDate.isNull());
+		assert(result.noEnum.isNull());
 		assert(result.nothingRef.isNull());
 	}
 	auto nullableTest2 = TestNull(1, "a");
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
 	nullableTest2.noDate = SysTime(DateTime(2000, 01, 01), UTC());
+	nullableTest2.noEnum = TestEnum.ya;
 	nullableTest2.nothingRef.bind(new uint(5));
 	runTest(nullableTest2);
 
