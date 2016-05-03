@@ -253,8 +253,6 @@ version(unittest) {
 				assert(immutableTest == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
 			}
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
-			static if (canAutomaticallyDeserializeString!U)
-				assert(input.toFormattedString!siryulizer.fromString!U == expected, "Automagic "~T.stringof~"->"~siryulizer.stringof~"->"~U.stringof~" failed");
 		}
 	}
 	void runTest2Fail(T, U)(U value) @safe nothrow {
