@@ -38,8 +38,9 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 				throw new SerializeException("Unknown extension");
 		}
 	} else { //Not autodetecting
-		import std.file : readText;
-		return fromString!(T, Format, flags)(path.readText);
+		import std.stdio : File, KeepTerminator;
+		import std.algorithm : joiner;
+		return fromString!(T, Format, flags)(File(path, "r").byLine(KeepTerminator.yes).joiner());
 	}
 }
 ///
@@ -115,7 +116,7 @@ unittest {
  +
  + Returns: A string in the specified format representing the user's data, UTF-8 encoded
  +/
-@property string toString(Format, Siryulize flags = Siryulize.none, T)(T data) if (isSiryulizer!Format) {
+@property auto toString(Format, Siryulize flags = Siryulize.none, T)(T data) if (isSiryulizer!Format) {
 	return Format.asString!flags(data);
 }
 ///
@@ -157,7 +158,8 @@ alias toFormattedString = toString;
 		}
 	} else { //Not autodetecting
 		import std.stdio : File;
-		File(path, "w").write(data.toString!(Format, flags));
+		import std.algorithm : copy;
+		data.toFormattedString!(Format, flags).copy(File(path, "w").lockingTextWriter());
 	}
 }
 ///
