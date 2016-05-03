@@ -40,7 +40,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	} else static if (isIntegral!T) {
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		enforce(node.type == JSON_TYPE.INTEGER, new UnexpectedTypeException(JSON_TYPE.INTEGER, node.type));
+		expect(node, JSON_TYPE.INTEGER);
 		return node.integer.to!T;
 	} else static if (isNullable!T) {
 		T output;
@@ -59,7 +59,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	} else static if (isFloatingPoint!T) {
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		enforce(node.type == JSON_TYPE.FLOAT, new UnexpectedTypeException(JSON_TYPE.FLOAT, node.type));
+		expect(node, JSON_TYPE.FLOAT);
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
 		if (node.type == JSON_TYPE.INTEGER)
@@ -68,14 +68,14 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 			return T.init;
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
-		enforce(node.type == JSON_TYPE.STRING || node.type == JSON_TYPE.NULL, new UnexpectedTypeException(JSON_TYPE.STRING, node.type));
+		expect(node, JSON_TYPE.STRING, JSON_TYPE.NULL);
 		if (node.type == JSON_TYPE.NULL)
 			return T.init;
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		return T.fromISOExtString(node.fromJSON!(string, flags));
 	} else static if (is(T == struct)) {
-		enforce(node.type == JSON_TYPE.OBJECT, new UnexpectedTypeException(JSON_TYPE.OBJECT, node.type));
+		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (member; FieldNameTuple!T) {
 			string memberName = member;
@@ -96,14 +96,14 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
-		enforce(node.type == JSON_TYPE.ARRAY, new UnexpectedTypeException(JSON_TYPE.ARRAY, node.type));
+		expect(node, JSON_TYPE.ARRAY);
 		T output = new T(node.array.length);
 		size_t i;
 		foreach (JSONValue newNode; node.array)
 			output[i++] = fromJSON!(ElementType!T, flags)(newNode);
 		return output;
 	} else static if(isStaticArray!T) {
-		enforce(node.type == JSON_TYPE.ARRAY, new UnexpectedTypeException(JSON_TYPE.ARRAY, node.type));
+		expect(node, JSON_TYPE.ARRAY);
 		enforce(node.array.length == T.length, new JSONDException("Static array length mismatch"));
 		T output;
 		size_t i;
@@ -111,7 +111,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 			output[i++] = fromJSON!(ElementType!T, flags)(newNode);
 		return output;
 	} else static if(isAssociativeArray!T) {
-		enforce(node.type == JSON_TYPE.OBJECT, new UnexpectedTypeException(JSON_TYPE.OBJECT, node.type));
+		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (string key, JSONValue value; node.object)
 			output[key] = fromJSON!(ValueType!T, flags)(value);
@@ -125,7 +125,11 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	} else
 		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
-
+void expect(T...)(JSONValue node, T types) {
+	import std.exception : enforce;
+	import std.algorithm : among;
+	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
+}
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
 	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, getUDAs, arity, Unqual;
 	import std.range : isInputRange;
