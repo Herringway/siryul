@@ -103,20 +103,14 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (member; FieldNameTuple!T) {
-				string memberName = member;
-				static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
-					memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
+				enum memberName = getMemberName!(__traits(getMember, T, member), member);
 				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
 					if (!node.containsKey(memberName))
 						continue;
 				} else
-					enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
-				static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-					alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
-					assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
-				} else
-					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)), flags);
+					enforce(memberName in node, new YAMLException("Missing non-@Optional "~memberName~" in node"));
+				alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
+				__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
@@ -193,15 +187,8 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 				} else if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
 					continue;
 			}
-			string memberName = member;
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
-				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-				alias toFunc = AliasSeq!(__traits(getMember, type, getUDAValue!(__traits(getMember, type, member), CustomParser).toFunc))[0];
-				assert(arity!toFunc == 1, "Arity of conversion function must be exactly 1");
-				output.add(memberName, toFunc(__traits(getMember, type, member)).toYAML!flags);
-			} else
-				output.add(memberName, __traits(getMember, type, member).toYAML!flags);
+			enum memberName = getMemberName!(__traits(getMember, T, member), member);
+			output.add(memberName, getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!flags);
 		}
 		return output;
 	} else

@@ -78,21 +78,15 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (member; FieldNameTuple!T) {
-			string memberName = member;
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-			}
-			static if ((hasUDA!(__traits(getMember, T, member), Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+			alias field = AliasSeq!(__traits(getMember, output, member));
+			enum memberName = getMemberName!(field, member);
+			static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
 				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
 					continue;
 			} else
 				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
-			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-				alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAValue!(__traits(getMember, output, member), CustomParser).fromFunc))[0];
-				assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
-				__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
-			} else
-				__traits(getMember, output, member) = fromJSON!(typeof(__traits(getMember, T, member)), flags)(node[memberName]);
+			alias fromFunc = getConvertFromFunc!(T, field);
+			__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
@@ -175,15 +169,8 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 					if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
 						continue;
 			}
-			string memberName = member;
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
-				memberName = getUDAValue!(__traits(getMember, T, member), SiryulizeAs).name;
-			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-				alias toFunc = AliasSeq!(__traits(getMember, type, getUDAValue!(__traits(getMember, type, member), CustomParser).toFunc))[0];
-				assert(arity!toFunc == 1, "Arity of conversion function must be exactly 1");
-				output.object[memberName] = toFunc(__traits(getMember, type, member)).toJSON!flags;
-			} else
-				output.object[memberName] = __traits(getMember, type, member).toJSON!flags;
+			enum memberName = getMemberName!(__traits(getMember, T, member), member);
+			output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
 		}
 	} else
 		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
