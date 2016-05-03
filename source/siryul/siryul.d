@@ -78,8 +78,7 @@ unittest {
 /++
  + Deserializes data from a string.
  +
- + String is assumed to be UTF-8 encoded. If no format (or AutoDetect) is
- + specified, an attempt at autodetction is made.
+ + String is assumed to be UTF-8 encoded.
  +
  + Params:
  + T = Type of the data to be deserialized
@@ -90,19 +89,8 @@ unittest {
  +
  + Returns: Data contained in the string
  +/
-T fromString(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none,U)(U str) if (((isSiryulizer!Format) || (is(Format == AutoDetect) && canAutomaticallyDeserializeString!T)) && isInputRange!U) {
-	static if (is(Format == AutoDetect)) {
-		static if (is(T == struct) || isAssociativeArray!T) {
-			if (str[0] == '{')
-				return fromString!(T, JSON, flags)(str);
-			return fromString!(T, YAML, flags)(str);
-		} else static if (isArray!T) {
-			if (str[0] == '[')
-				return fromString!(T, JSON, flags)(str);
-			return fromString!(T, YAML, flags)(str);
-		}
-	} else //Not autodetecting
-		return Format.parseInput!(T, flags)(str);
+T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str) if (isSiryulizer!Format && isInputRange!U) {
+	return Format.parseInput!(T, flags)(str);
 }
 ///
 unittest {
@@ -113,11 +101,6 @@ unittest {
 	const aStruct = fromString!(TestStruct, JSON)(`{"a": "b"}`);
 	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b");
 	assert(aStruct == anotherStruct);
-
-	//Compare a struct serialized into two different formats and auto-detect format
-	const aStruct2 = fromString!TestStruct(`{"a": "b"}`);
-	const anotherStruct2 = fromString!TestStruct("---\na: b");
-	assert(aStruct2 == anotherStruct2);
 }
 /++
  + Serializes data to a string.
@@ -511,18 +494,6 @@ static assert(isTimeType!TimeOfDay);
 static assert(!isTimeType!string);
 static assert(!isTimeType!uint);
 static assert(!isTimeType!(DateTime[]));
-/++
- + Determines whether or not a given type can be read from a string unambiguously
- +/
-template canAutomaticallyDeserializeString(T) {
-	enum canAutomaticallyDeserializeString = (isArray!T && !isSomeString!T) || isAssociativeArray!T || (is(T == struct) && !isTimeType!T);
-}
-static assert(canAutomaticallyDeserializeString!(string[]));
-static assert(canAutomaticallyDeserializeString!(string[string]));
-private struct ExampleStruct {}
-static assert(canAutomaticallyDeserializeString!(ExampleStruct));
-static assert(!canAutomaticallyDeserializeString!string);
-static assert(!canAutomaticallyDeserializeString!uint);
 /++
  + Gets the value contained within an UDA (only first attribute)
  +/
