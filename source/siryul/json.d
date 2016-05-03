@@ -1,5 +1,5 @@
 module siryul.json;
-private import siryul;
+private import siryul.common;
 private import std.json : JSONValue, parseJSON, toJSON, JSON_TYPE;
 private import std.range.primitives : isInputRange, ElementType, isInfinite;
 private import std.typecons;
@@ -23,7 +23,7 @@ struct JSON {
 }
 
 private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!isInfinite!T) {
-	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
+	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
 	import std.exception : enforce;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.range : isOutputRange;
@@ -127,7 +127,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 }
 
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, arity, Unqual;
+	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, getUDAs, arity, Unqual;
 	import std.range : isInputRange;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;

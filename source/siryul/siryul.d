@@ -387,99 +387,14 @@ version(unittest) {
 
 	import std.typecons : Flag;
 	runTest2(true, Flag!"Yep".yes);
-
-	//const int a = 1;
-	//runTest(a);
 }
-/++
- + Thrown when an error occurs
- +/
-class SiryulException : Exception {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
-}
-/++
- + Thrown when a serialization error occurs
- +/
-class SerializeException : SiryulException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
-}
-/++
- + Thrown when a deserialization error occurs
- +/
-class DeserializeException : SiryulException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
-}
-///Used when nonpresence of field is not an error
-enum Optional;
-///Write field as string
-enum AsString;
-///Write field as binary (NYI)
-enum AsBinary;
+///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
+enum ISO8601;
+///Use extended ISO8601 format for dates and times - YYYY-MM-DDTHH:MM:SS.FFFFFFFTZ
+///Generally more readable than standard format.
+enum ISO8601Extended;
 ///Autodetect the serialization format where possible.
 enum AutoDetect;
-/++
- + (De)serialize field using a different name.
- +
- + Especially useful for fields that happen to use D keywords.
- +/
-struct SiryulizeAs {
-	///Serialized field name
-	string name;
-}
-/++
- + Use custom parser functions for a given field.
- +
- + The function names must exist as methods in the struct. Any (de)serializable
- + type may be used for fromFunc's argument and toFunc's return value, but
- + fromFunc's return type and toFunc's argument type must be the same as the
- + field's type.
- +/
-struct CustomParser {
-	///Function to be used in deserialization
-	string fromFunc;
-	///Function to be used in serialization
-	string toFunc;
-}
-///Serialization options
-enum Siryulize {
-	none, ///Default behaviour
-	omitNulls = 1 << 0, ///Omit null values from output
-	omitInits = 1 << 1 ///Omit values == type.init from output
-}
-///Deserialization options
-enum DeSiryulize {
-	none, ///Default behaviour
-	optionalByDefault = 1 << 0 ///All members will be considered to be @Optional
-}
-template isNullable(T) {
-	enum isNullable = isNullableValue!T || isNullableRef!T;
-}
-template isNullable(alias T) {
-	enum isNullable = isNullableValue!(typeof(T)) || isNullableRef!(typeof(T));
-}
-package template isNullableValue(T) {
-	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
-		enum isNullableValue = true;
-	else
-		enum isNullableValue = false;
-}
-package template isNullableRef(T) {
-	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, NullableRef!(TemplateArgsOf!T)) && is(T == NullableRef!(TemplateArgsOf!T)))
-		enum isNullableRef = true;
-	else
-		enum isNullableRef = false;
-}
-static assert(isNullable!(Nullable!int));
-static assert(isNullable!(Nullable!(int, 0)));
-static assert(isNullable!(NullableRef!int));
-static assert(!isNullable!int);
-
 package template isTimeType(T) {
 	import std.datetime;
 	enum isTimeType = is(T == DateTime) || is(T == SysTime) || is(T == TimeOfDay) || is(T == Date);
@@ -495,23 +410,6 @@ static assert(!isTimeType!(DateTime[]));
 /++
  + Gets the value contained within an UDA (only first attribute)
  +/
-template getUDAValue(alias T, UDA) {
-	static if (__traits(compiles, getUDAs!T)) {
-		enum getUDAValue = getUDAs!(T, UDA)[0].value;
-	} else {
-		enum getUDAValue = () {
-			static assert(hasUDA!(T, UDA));
-			foreach(uda; __traits(getAttributes, T))
-				static if(is(typeof(uda) == UDA))
-					return uda;
-			assert(0);
-		}();
-	}
-}
-unittest {
-	@SiryulizeAs("a") string thinger;
-	static assert(getUDAValue!(thinger, SiryulizeAs).name == "a");
-}
 /++
  + Determines whether or not the given type is a valid (de)serializer
  +/
@@ -524,16 +422,3 @@ template isSiryulizer(T) {
 }
 //static assert(allSatisfy!(isSiryulizer, siryulizers));
 //static assert(!isSiryulizer!uint);
-
-T* moveToHeap(T)(ref T value) {
-    import core.memory : GC;
-    import std.algorithm : moveEmplace;
-    auto ptr = cast(T*)GC.malloc(T.sizeof, 0, typeid(T));
-    moveEmplace(value, *ptr);
-    return ptr;
-}
-package template isSimpleList(T) {
-	import std.traits : isSomeString, isArray;
-	import std.range : isInputRange;
-	enum isSimpleList = isInputRange!T || (isArray!T && !isSomeString!T);
-}
