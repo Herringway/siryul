@@ -1,12 +1,12 @@
-module siryul.yaml;
+module siryul.dyaml;
 private import siryul.common;
-private import std.range : isInfinite, isInputRange, ElementType;
-private import std.traits : isSomeChar;
-version(Have_wyaml) {
-import wyaml;
-private import std.array;
+version(Have_dyaml) {
+import dyaml.all;
+import dyaml.stream;
+private import std.range.primitives : isInfinite, isInputRange, ElementType;
 private import std.typecons;
-private import std.outbuffer;
+private import std.traits : isSomeChar;
+
 /++
  + YAML (YAML Ain't Markup Language) serialization format
  +/
@@ -14,22 +14,27 @@ struct YAML {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!(".yml", ".yaml");
 	enum emptyObject = "---\n...";
-	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
+	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.utf : byChar;
-		auto loader = Loader(data.byChar.array).load();
+		import std.conv : to;
+		auto loader = Loader.fromString(data.byChar.to!(char[])).load();
 		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
 	}
 	package static string asString(Siryulize flags, T)(T data) {
-		auto stream = new OutBuffer;
-		auto dumper = dumper(stream);
+		auto stream = new YMemoryStream();
+		auto dumper = Dumper(stream);
 		auto representer = new Representer;
 		representer.defaultCollectionStyle = CollectionStyle.Block;
 		representer.defaultScalarStyle = ScalarStyle.Plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
 		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags))());
-		return stream.toString;
+		return stream.toStr;
 	}
+}
+private @property string toStr(YMemoryStream stream) @trusted {
+	import std.string : assumeUTF;
+	return assumeUTF(stream.data);
 }
 /++
  + Thrown on YAML deserialization errors
@@ -47,7 +52,7 @@ class YAMLSException : SerializeException {
 		super(msg, file, line);
 	}
 }
-private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInfinite!T) {
+private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfinite!T) {
 	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
 	import std.exception : enforce;
 	import std.datetime : SysTime, Date, DateTime, TimeOfDay;
@@ -60,7 +65,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 		static if (is(T == enum)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			if (node.tag == `tag:yaml.org,2002:str`)
-				return node.toString.to!T;
+				return node.get!string.to!T;
 			else
 				return node.fromYAML!(OriginalType!T, flags).to!T;
 		} else static if (isNullable!T) {
@@ -77,27 +82,27 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			if (node.tag == `tag:yaml.org,2002:str`)
-				return node.toString.to!T;
-			return cast(T)node;
+				return node.get!string.to!T;
+			return node.get!T;
 		} else static if (isSomeChar!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			return (cast(T[])node)[0];
+			return node.get!(T[])[0];
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			return (cast(SysTime)node).to!T;
+			return node.get!SysTime.to!T;
 		} else static if (is(T == TimeOfDay)) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
-			return TimeOfDay.fromISOExtString(node.toString);
+			return TimeOfDay.fromISOExtString(node.get!string);
 		} else static if (is(T == struct)) {
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (member; FieldNameTuple!T) {
 				enum memberName = getMemberName!(__traits(getMember, T, member), member);
 				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if (memberName !in node)
+					if (!node.containsKey(memberName))
 						continue;
 				} else
-					enforce(memberName in node, new YAMLException("Missing non-@Optional "~memberName~" in node"));
+					enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
 				alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
 				__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
 			}
@@ -122,7 +127,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);
 			return output;
 		} else static if (is(T == bool)) {
-			return cast(T)node;
+			return node.get!T;
 		} else
 			static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
 	} catch (NodeException e) {
@@ -130,7 +135,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 	}
 }
 private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : Unqual, hasUDA, getUDAs, isSomeString, isAssociativeArray, FieldNameTuple, arity;
+	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity, getUDAs;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
@@ -187,16 +192,4 @@ private template canStoreUnchanged(T) {
 	import std.traits : isIntegral, isFloatingPoint;
 	enum canStoreUnchanged = isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string);
 }
-} else version(Have_dyaml) {} else {
-	struct YAML {
-		enum emptyObject = "---\n...";
-		private import std.meta : AliasSeq;
-		package alias types = AliasSeq!();
-		package static T parseInput(T, DeSiryulize flags, U)(U) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
-			assert(0, "YAML Unavailable");
-		}
-		package static string asString(Siryulize flags, T)(T) @safe {
-			assert(0, "YAML Unavailable");
-		}
-	}
 }
