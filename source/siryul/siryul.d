@@ -460,5 +460,5 @@ template isSiryulizer(T) {
 		string str = T.asString!(Siryulize.none)(3);
 	});
 }
-//static assert(allSatisfy!(isSiryulizer, siryulizers));
-//static assert(!isSiryulizer!uint);
+static assert(allSatisfy!(isSiryulizer, siryulizers));
+debug {} else static assert(!isSiryulizer!uint);
