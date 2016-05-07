@@ -39,9 +39,6 @@ class DeserializeException : SiryulException {
 package template isNullable(T) {
 	enum isNullable = isNullableValue!T || isNullableRef!T;
 }
-package template isNullable(alias T) {
-	enum isNullable = isNullableValue!(typeof(T)) || isNullableRef!(typeof(T));
-}
 package template isNullableValue(T) {
 	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
 		enum isNullableValue = true;
@@ -100,44 +97,6 @@ package T* moveToHeap(T)(ref T value) {
     moveEmplace(value, *ptr);
     return ptr;
 }
-
-/+
-			foreach (member; FieldNameTuple!T) {
-				string memberName = member;
-				static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs))
-					memberName = getUDAs!(__traits(getMember, T, member), SiryulizeAs)[0].name;
-				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if (memberName !in node)
-						continue;
-				} else
-					enforce(memberName in node, new YAMLException("Missing non-@Optional "~memberName~" in node"));
-				static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-					alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAs!(__traits(getMember, output, member), CustomParser)[0].fromFunc))[0];
-					assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
-				} else
-					__traits(getMember, output, member) = node[memberName].fromYAML!(typeof(__traits(getMember, T, member)), flags);
-			}
-
-
-		foreach (member; FieldNameTuple!T) {
-			string memberName = member;
-			static if (hasUDA!(__traits(getMember, T, member), SiryulizeAs)) {
-				memberName = getUDAs!(__traits(getMember, T, member), SiryulizeAs)[0].name;
-			}
-			static if ((hasUDA!(__traits(getMember, T, member), Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
-					continue;
-			} else
-				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
-			static if (hasUDA!(__traits(getMember, T, member), CustomParser)) {
-				alias fromFunc = AliasSeq!(__traits(getMember, output, getUDAs!(__traits(getMember, output, member), CustomParser)[0].fromFunc))[0];
-				assert(arity!fromFunc == 1, "Arity of conversion function must be exactly 1");
-				__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
-			} else
-				__traits(getMember, output, member) = fromJSON!(typeof(__traits(getMember, T, member)), flags)(node[memberName]);
-		}
-		return output;+/
 package template getMemberName(alias T, string def) {
 	static if (hasUDA!(T, SiryulizeAs)) {
 		enum getMemberName = getUDAs!(T, SiryulizeAs)[0].name;

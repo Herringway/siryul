@@ -175,7 +175,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
 			static if (!!(flags & Siryulize.omitInits)) {
-				static if (isNullable!(__traits(getMember, type, member))) {
+				static if (isNullable!(typeof(__traits(getMember, type, member)))) {
 					if (__traits(getMember, type, member).isNull)
 						continue;
 				} else if (__traits(getMember, type, member) == __traits(getMember, type, member).init)

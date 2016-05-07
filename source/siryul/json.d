@@ -162,7 +162,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
 			static if (!!(flags & Siryulize.omitInits)) {
-				static if (isNullable!(__traits(getMember, T, member))) {
+				static if (isNullable!(typeof(__traits(getMember, T, member)))) {
 					if (__traits(getMember, type, member).isNull)
 						continue;
 				} else
