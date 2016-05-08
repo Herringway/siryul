@@ -97,7 +97,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
 			T output;
 			foreach (member; FieldNameTuple!T) {
-				enum memberName = getMemberName!(__traits(getMember, T, member), member);
+				enum memberName = getMemberName!(__traits(getMember, T, member));
 				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
 					if (!node.containsKey(memberName))
 						continue;
@@ -181,7 +181,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 				} else if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
 					continue;
 			}
-			enum memberName = getMemberName!(__traits(getMember, T, member), member);
+			enum memberName = getMemberName!(__traits(getMember, T, member));
 			output.add(memberName, getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!flags);
 		}
 		return output;

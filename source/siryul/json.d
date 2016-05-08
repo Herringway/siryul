@@ -79,7 +79,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		T output;
 		foreach (member; FieldNameTuple!T) {
 			alias field = AliasSeq!(__traits(getMember, output, member));
-			enum memberName = getMemberName!(field, member);
+			enum memberName = getMemberName!field;
 			static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
 				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
 					continue;
@@ -169,7 +169,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 					if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
 						continue;
 			}
-			enum memberName = getMemberName!(__traits(getMember, T, member), member);
+			enum memberName = getMemberName!(__traits(getMember, T, member));
 			output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
 		}
 	} else

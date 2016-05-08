@@ -97,19 +97,19 @@ package T* moveToHeap(T)(ref T value) {
     moveEmplace(value, *ptr);
     return ptr;
 }
-package template getMemberName(alias T, string def) {
+package template getMemberName(alias T) {
 	static if (hasUDA!(T, SiryulizeAs)) {
 		enum getMemberName = getUDAs!(T, SiryulizeAs)[0].name;
 	} else
-		enum getMemberName = def;
+		enum getMemberName = T.stringof;
 }
 unittest {
 	struct TestStruct {
 		string something;
 		@SiryulizeAs("Test") string somethingElse;
 	}
-	assert(getMemberName!(__traits(getMember, TestStruct, "something"), "something") == "something");
-	assert(getMemberName!(__traits(getMember, TestStruct, "somethingElse"), "somethingElse") == "Test");
+	assert(getMemberName!(__traits(getMember, TestStruct, "something")) == "something");
+	assert(getMemberName!(__traits(getMember, TestStruct, "somethingElse")) == "Test");
 }
 package template getConvertToFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
