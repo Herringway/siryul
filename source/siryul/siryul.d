@@ -216,7 +216,7 @@ version(unittest) {
 	}
 	enum TestEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
 	struct TestNull {
-		import std.typecons : Nullable, NullableRef;
+		import std.typecons : Nullable;
 		uint notNull;
 		string aString;
 		uint[] emptyArray;
@@ -224,7 +224,6 @@ version(unittest) {
 		Nullable!(uint,0) anotherNullable;
 		Nullable!SysTime noDate;
 		Nullable!TestEnum noEnum;
-		NullableRef!uint nothingRef;
 		void toString(scope void delegate(const(char)[]) @safe sink) @safe const {
 			import std.format : formattedWrite;
 			sink("TestNull(");
@@ -247,10 +246,6 @@ version(unittest) {
 				sink("null, ");
 			else
 				formattedWrite(sink, "%s, ", noEnum.get);
-			if (nothingRef.isNull)
-				sink("null, ");
-			else
-				formattedWrite(sink, "%s, ", nothingRef.get);
 			sink(")");
 		}
 	}
@@ -359,14 +354,12 @@ version(unittest) {
 		assert(result.anotherNullable.isNull());
 		assert(result.noDate.isNull());
 		assert(result.noEnum.isNull());
-		assert(result.nothingRef.isNull());
 	}
 	auto nullableTest2 = TestNull(1, "a");
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
 	nullableTest2.noDate = SysTime(DateTime(2000, 01, 01), UTC());
 	nullableTest2.noEnum = TestEnum.ya;
-	nullableTest2.nothingRef.bind(new uint(5));
 	runTest(nullableTest2);
 
 	struct SiryulizeAsTest {

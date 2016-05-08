@@ -39,22 +39,14 @@ class DeserializeException : SiryulException {
 	}
 }
 
-alias isNullable = templateOr!(isNullableValue, isNullableRef);
-package template isNullableValue(T) {
+package template isNullable(T) {
 	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
-		enum isNullableValue = true;
+		enum isNullable = true;
 	else
-		enum isNullableValue = false;
-}
-package template isNullableRef(T) {
-	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, NullableRef!(TemplateArgsOf!T)) && is(T == NullableRef!(TemplateArgsOf!T)))
-		enum isNullableRef = true;
-	else
-		enum isNullableRef = false;
+		enum isNullable = false;
 }
 static assert(isNullable!(Nullable!int));
 static assert(isNullable!(Nullable!(int, 0)));
-static assert(isNullable!(NullableRef!int));
 static assert(!isNullable!int);
 
 /++
@@ -66,7 +58,11 @@ struct SiryulizeAs {
 	///Serialized field name
 	string name;
 }
-///Used when nonpresence of field is not an error
+/++
+ + Used when nonpresence of field is not an error. The field will have its .init
+ + value when read. If being able to detect nonpresence is desired, ensure that
+ + the default value cannot appear in the data or use a Nullable type.
+ +/
 enum Optional;
 /++
  + Use custom parser functions for a given field.
@@ -94,13 +90,6 @@ static assert(!isSimpleList!(string));
 static assert(!isSimpleList!(char[]));
 static assert(!isSimpleList!(int));
 
-package T* moveToHeap(T)(ref T value) {
-    import core.memory : GC;
-    import std.algorithm : moveEmplace;
-    auto ptr = cast(T*)GC.malloc(T.sizeof, 0, typeid(T));
-    moveEmplace(value, *ptr);
-    return ptr;
-}
 package template getMemberName(alias T) {
 	static if (hasUDA!(T, SiryulizeAs)) {
 		enum getMemberName = getUDAs!(T, SiryulizeAs)[0].name;

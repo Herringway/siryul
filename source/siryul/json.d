@@ -47,14 +47,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		if (node.type == JSON_TYPE.NULL)
 			output.nullify();
 		else
-			static if (isNullableValue!T) {
-				output = node.fromJSON!(TemplateArgsOf!T[0], flags);
-			} else {
-				auto val = node.fromJSON!(TemplateArgsOf!T[0], flags);
-				() @trusted {
-					output.bind(moveToHeap(val));
-				}();
-			}
+			output = node.fromJSON!(TemplateArgsOf!T[0], flags);
 		return output;
 	} else static if (isFloatingPoint!T) {
 		if (node.type == JSON_TYPE.STRING)

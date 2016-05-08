@@ -64,16 +64,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 			else
 				return node.fromYAML!(OriginalType!T, flags).to!T;
 		} else static if (isNullable!T) {
-			T output;
-			auto val = node.fromYAML!(TemplateArgsOf!T[0], flags);
-			static if (isNullableValue!T) {
-				output = val;
-			} else {
-				() @trusted {
-					output.bind(moveToHeap(val));
-				}();
-			}
-			return output;
+			return node.isNull ? T.init : T(node.fromYAML!(TemplateArgsOf!T[0], flags));
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			if (node.tag == `tag:yaml.org,2002:str`)
