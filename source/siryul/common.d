@@ -1,6 +1,8 @@
 module siryul.common;
 import std.typecons : Nullable, NullableRef;
-import std.traits : TemplateArgsOf, hasUDA, getUDAs, arity;
+import std.meta : templateAnd, templateOr, templateNot;
+import std.range : isInputRange;
+import std.traits : TemplateArgsOf, hasUDA, getUDAs, arity, TemplateOf, isSomeString, isArray, isIterable;
 ///Serialization options
 enum Siryulize {
 	none, ///Default behaviour
@@ -36,9 +38,8 @@ class DeserializeException : SiryulException {
 		super(msg, file, line);
 	}
 }
-package template isNullable(T) {
-	enum isNullable = isNullableValue!T || isNullableRef!T;
-}
+
+alias isNullable = templateOr!(isNullableValue, isNullableRef);
 package template isNullableValue(T) {
 	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
 		enum isNullableValue = true;
@@ -85,11 +86,14 @@ struct CustomParser {
 enum AsString;
 ///Write field as binary (NYI)
 enum AsBinary;
-package template isSimpleList(T) {
-	import std.traits : isSomeString, isArray;
-	import std.range : isInputRange;
-	enum isSimpleList = isInputRange!T || (isArray!T && !isSomeString!T);
-}
+
+alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString);
+static assert(isSimpleList!(int[]));
+static assert(isSimpleList!(string[]));
+static assert(!isSimpleList!(string));
+static assert(!isSimpleList!(char[]));
+static assert(!isSimpleList!(int));
+
 package T* moveToHeap(T)(ref T value) {
     import core.memory : GC;
     import std.algorithm : moveEmplace;
