@@ -95,7 +95,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		T output;
 		size_t i;
 		foreach (JSONValue newNode; node.array)
-			output[i++] = fromJSON!(ElementType!T, flags)(newNode);
+			output[i++] = fromJSON!(typeof(output[0]), flags)(newNode);
 		return output;
 	} else static if(isAssociativeArray!T) {
 		expect(node, JSON_TYPE.OBJECT);
