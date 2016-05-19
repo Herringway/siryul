@@ -59,6 +59,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 	import std.range : isOutputRange;
 	import std.conv : to;
 	import std.meta : AliasSeq;
+	import std.string : representation;
 	if (node.isNull)
 		return T.init;
 	try {
@@ -103,6 +104,12 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 			T output;
 			foreach (Node newNode; node)
 				output ~= fromYAML!(ElementType!T, flags)(newNode);
+			return output;
+		} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
+			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			T output;
+			foreach (i, chr; node.fromYAML!((typeof(output[0]))[], flags).representation)
+				output[i] = cast(typeof(output[0]))chr;
 			return output;
 		} else static if(isStaticArray!T) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));

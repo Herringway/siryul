@@ -29,6 +29,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	import std.range : isOutputRange;
 	import std.conv : to, text;
 	import std.range.primitives : front;
+	import std.string : representation;
 	import std.conv : to;
 	import std.meta : AliasSeq;
 	static if (is(T == enum)) {
@@ -88,6 +89,12 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		size_t i;
 		foreach (JSONValue newNode; node.array)
 			output[i++] = fromJSON!(ElementType!T, flags)(newNode);
+		return output;
+	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
+		expect(node, JSON_TYPE.STRING);
+		T output;
+		foreach (i, chr; node.fromJSON!((typeof(output[0]))[], flags).representation)
+			output[i] = cast(typeof(output[0]))chr;
 		return output;
 	} else static if(isStaticArray!T) {
 		expect(node, JSON_TYPE.ARRAY);

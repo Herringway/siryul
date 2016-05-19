@@ -423,6 +423,13 @@ version(unittest) {
 
 	char[32] testChr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 	runTest2(testChr, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", testChr);
+	dchar[32] testChr2 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+	runTest2(testChr2, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"d);
+	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"d, testChr2);
+	wchar[32] testChr3 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+	runTest2(testChr3, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w);
+	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w, testChr3);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
