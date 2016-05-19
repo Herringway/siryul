@@ -420,6 +420,9 @@ version(unittest) {
 
 	import std.typecons : Flag;
 	runTest2(true, Flag!"Yep".yes);
+
+	char[32] testChr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+	runTest2(testChr, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

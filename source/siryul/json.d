@@ -118,7 +118,7 @@ void expect(T...)(JSONValue node, T types) {
 	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
 }
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, getUDAs, arity, Unqual;
+	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, getUDAs, arity, Unqual, isStaticArray;
 	import std.range : isInputRange;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
@@ -135,7 +135,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 		output = JSONValue(type.toISOExtString());
 	} else static if (canStoreUnchanged!Undecorated) {
 		output = JSONValue(type.to!Undecorated);
-	} else static if (isSomeString!Undecorated) {
+	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
 		import std.utf : toUTF8;
 		output = JSONValue(type.toUTF8);
 	} else static if (isSomeChar!Undecorated) {

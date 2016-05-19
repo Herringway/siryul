@@ -125,8 +125,8 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 		throw new YAMLException(e.msg);
 	}
 }
-private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity, getUDAs;
+private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!isInfinite!T) {
+	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity, getUDAs, isStaticArray;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
@@ -148,7 +148,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @trusted if (
 		return [type].toYAML!flags;
 	} else static if (canStoreUnchanged!Undecorated) {
 		return Node(type.to!Undecorated);
-	} else static if (isSomeString!Undecorated) {
+	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
 		import std.utf : toUTF8;
 		return type.toUTF8().idup.toYAML!flags;
 	} else static if(isAssociativeArray!Undecorated) {
