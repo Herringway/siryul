@@ -48,7 +48,7 @@ class YAMLSException : SerializeException {
 	}
 }
 private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInfinite!T) {
-	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
+	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
 	import std.exception : enforce;
 	import std.datetime : SysTime, Date, DateTime, TimeOfDay;
 	import std.range : isOutputRange;
