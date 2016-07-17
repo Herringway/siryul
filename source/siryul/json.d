@@ -23,13 +23,13 @@ struct JSON {
 }
 
 private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!isInfinite!T) {
-	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters;
+	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
 	import std.exception : enforce;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
-	import std.range : isOutputRange;
+	import std.range : isOutputRange, enumerate;
 	import std.conv : to, text;
 	import std.range.primitives : front;
-	import std.string : representation;
+	import std.utf : byCodeUnit;
 	import std.conv : to;
 	import std.meta : AliasSeq;
 	static if (is(T == enum)) {
@@ -93,16 +93,15 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
 		expect(node, JSON_TYPE.STRING);
 		T output;
-		foreach (i, chr; node.fromJSON!((typeof(output[0]))[], flags).representation)
-			output[i] = cast(typeof(output[0]))chr;
+		foreach (i, chr; node.fromJSON!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
+			output[i] = chr;
 		return output;
 	} else static if(isStaticArray!T) {
 		expect(node, JSON_TYPE.ARRAY);
 		enforce(node.array.length == T.length, new JSONDException("Static array length mismatch"));
 		T output;
-		size_t i;
-		foreach (JSONValue newNode; node.array)
-			output[i++] = fromJSON!(typeof(output[0]), flags)(newNode);
+		foreach (i, JSONValue newNode; node.array)
+			output[i] = fromJSON!(ForeachType!T, flags)(newNode);
 		return output;
 	} else static if(isAssociativeArray!T) {
 		expect(node, JSON_TYPE.OBJECT);
