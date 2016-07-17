@@ -118,7 +118,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 	} else
 		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
-void expect(T...)(JSONValue node, T types) {
+private void expect(T...)(JSONValue node, T types) {
 	import std.exception : enforce;
 	import std.algorithm : among;
 	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
