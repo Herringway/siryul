@@ -203,11 +203,3 @@ class UnexpectedTypeException : JSONDException {
 		super(str, file, line);
 	}
 }
-/++
- + Thrown on JSON serialization errors
- +/
-class JSONSException : DeserializeException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
-}
