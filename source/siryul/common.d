@@ -59,8 +59,8 @@ struct SiryulizeAs {
 	string name;
 }
 /++
- + Used when nonpresence of field is not an error. The field will have its .init
- + value when read. If being able to detect nonpresence is desired, ensure that
+ + Used when nonpresence of field is not an error. The field will be set to its
+ + .init value. If being able to detect nonpresence is desired, ensure that
  + the default value cannot appear in the data or use a Nullable type.
  +/
 enum Optional;
