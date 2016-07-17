@@ -51,9 +51,10 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
 	import std.exception : enforce;
 	import std.datetime : SysTime, Date, DateTime, TimeOfDay;
-	import std.range : isOutputRange;
+	import std.range : isOutputRange, enumerate;
 	import std.conv : to;
 	import std.meta : AliasSeq;
+	import std.utf : byCodeUnit;
 	if (node.isNull)
 		return T.init;
 	try {
@@ -98,6 +99,12 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @trusted if (!isInf
 			T output;
 			foreach (Node newNode; node)
 				output ~= fromYAML!(ElementType!T, flags)(newNode);
+			return output;
+		} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
+			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			T output;
+			foreach (i, chr; node.fromYAML!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
+				output[i] = chr;
 			return output;
 		} else static if(isStaticArray!T) {
 			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
