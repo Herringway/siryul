@@ -75,6 +75,8 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
+			static if (isIntegral!T)
+				enforce(node.tag == `tag:yaml.org,2002:int`, new YAMLException("Attempted to read a float as an integer"));
 			return node.get!T;
 		} else static if (isSomeChar!T) {
 			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
