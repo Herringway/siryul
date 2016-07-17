@@ -194,12 +194,7 @@ class JSONDException : DeserializeException {
 class UnexpectedTypeException : JSONDException {
 	package this(JSON_TYPE expectedType, JSON_TYPE unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
-		string str;
-		try {
-			str = "Expecting JSON type "~expectedType.text~", got "~unexpectedType.text;
-		} catch (Exception) {
-			str = "Bad JSON type";
-		}
-		super(str, file, line);
+		import std.exception : ifThrown, assumeWontThrow;
+		super("Expecting JSON type "~assumeWontThrow(expectedType.text.ifThrown("Unknown"))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
 	}
 }
