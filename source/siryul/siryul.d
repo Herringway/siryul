@@ -430,6 +430,11 @@ version(unittest) {
 	wchar[32] testChr3 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 	runTest2(testChr3, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w);
 	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w, testChr3);
+
+	//int -> float[] array doesn't even make sense, should be rejected
+	runTest2Fail!(float[])(3);
+	//Precision loss should be rejected by default
+	runTest2Fail!int(3.5);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
