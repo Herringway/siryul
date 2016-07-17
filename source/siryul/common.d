@@ -112,7 +112,7 @@ package template getConvertToFunc(T, alias member) {
 	} else
 		alias getConvertToFunc = (const(typeof(member)) v) { return v; };
 }
-unittest {
+version(unittest) {
 	import std.datetime : SysTime;
 	struct TimeTest {
 		@CustomParser("fromJunk", "toJunk") SysTime time;
@@ -124,6 +124,9 @@ unittest {
 			return "this has nothing to do with time.";
 		}
 	}
+}
+unittest {
+	import std.datetime : SysTime;
 	assert(getConvertToFunc!(TimeTest, TimeTest.time)(SysTime.min) == "this has nothing to do with time.");
 	assert(getConvertToFunc!(TimeTest, TimeTest.nothing)("test") == "test");
 }
@@ -137,16 +140,6 @@ package template getConvertFromFunc(T, alias member) {
 }
 unittest {
 	import std.datetime : SysTime;
-	struct TimeTest {
-		@CustomParser("fromJunk", "toJunk") SysTime time;
-		string nothing;
-		static SysTime fromJunk(string) {
-			return SysTime.min;
-		}
-		static string toJunk(SysTime) {
-			return "this has nothing to do with time.";
-		}
-	}
 	assert(getConvertFromFunc!(TimeTest, TimeTest.time)("yep") == SysTime.min);
 	assert(getConvertFromFunc!(TimeTest, TimeTest.nothing)("test") == "test");
 }
