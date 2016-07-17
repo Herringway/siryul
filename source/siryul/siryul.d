@@ -253,7 +253,9 @@ version(unittest) {
 @safe unittest {
 	import std.stdio : writeln;
 	import std.algorithm : filter, canFind;
+	import std.conv : to, text;
 	import std.exception : assertThrown;
+	import std.format : format;
 	import std.datetime : DateTime, SysTime, Date, TimeOfDay;
 	import std.meta : AliasSeq, Filter;
 	import std.traits : Fields;
@@ -271,8 +273,6 @@ version(unittest) {
 	}
 	alias SkipImmutable = Flag!"SkipImmutable";
 	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(T input, U expected) @safe {
-		import std.string : format;
-		import std.conv : to;
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
@@ -300,9 +300,9 @@ version(unittest) {
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 		}
 	}
-	void runTest2Fail(T, U)(U value) @safe nothrow {
+	void runTest2Fail(T, U)(U value) @safe {
 		foreach (siryulizer; siryulizers)
-			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer));
+			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer), "Expected "~siryulizer.stringof~" to throw for "~value.text~" to "~T.stringof);
 	}
 	void runTest(T)(T expected) @safe {
 		runTest2(expected, expected);
