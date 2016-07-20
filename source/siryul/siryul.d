@@ -435,6 +435,19 @@ version(unittest) {
 	runTest2Fail!(float[])(3);
 	//Precision loss should be rejected by default
 	runTest2Fail!int(3.5);
+	//bool -> string???
+	runTest2Fail!string(true);
+	//string -> bool???
+	runTest2Fail!bool("nah");
+
+	struct IgnoreErrBad {
+		float n = 1.2;
+	}
+	struct IgnoreErrGood {
+		@IgnoreErrors int n = 5;
+	}
+	foreach (siryulizer; siryulizers)
+		assert(IgnoreErrBad().toString!siryulizer.fromString!(IgnoreErrGood, siryulizer).n == IgnoreErrGood.init.n, "IgnoreErrors test failed for "~siryulizer.stringof);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

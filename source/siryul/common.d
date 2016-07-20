@@ -82,6 +82,8 @@ struct CustomParser {
 enum AsString;
 ///Write field as binary (NYI)
 enum AsBinary;
+///Errors are ignored; value will be .init
+enum IgnoreErrors;
 
 alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString);
 static assert(isSimpleList!(int[]));

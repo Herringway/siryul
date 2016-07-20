@@ -60,6 +60,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 			return node.integer.to!T;
 		if (node.type == JSON_TYPE.NULL)
 			return T.init;
+		expect(node, JSON_TYPE.STRING);
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
 		expect(node, JSON_TYPE.STRING, JSON_TYPE.NULL);
@@ -80,7 +81,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 			} else
 				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
 			alias fromFunc = getConvertFromFunc!(T, field);
-			__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
+			static if (hasUDA!(field, IgnoreErrors)) {
+				try {
+					__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
+				} catch (UnexpectedTypeException) {} //just skip it
+			} else {
+				__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
+			}
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {

@@ -98,7 +98,12 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 				} else
 					enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
 				alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
-				__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+				static if (hasUDA!(__traits(getMember, T, member), IgnoreErrors)) {
+					try {
+						__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+					} catch (YAMLException) {}
+				} else
+					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
@@ -127,6 +132,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);
 			return output;
 		} else static if (is(T == bool)) {
+			enforce(node.tag == `tag:yaml.org,2002:bool`, new YAMLException("Expecting a boolean value"));
 			return node.get!T;
 		} else
 			static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
