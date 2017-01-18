@@ -150,7 +150,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 		output = JSONValue(type.to!Undecorated);
 	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
 		import std.utf : toUTF8;
-		output = JSONValue(type.toUTF8);
+		output = JSONValue(type[].toUTF8);
 	} else static if (isSomeChar!Undecorated) {
 		output = [type].idup.toJSON!flags;
 	} else static if (isAssociativeArray!Undecorated) {
