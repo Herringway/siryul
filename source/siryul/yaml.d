@@ -185,7 +185,7 @@ private template canStoreUnchanged(T) {
 	import std.traits : isIntegral, isFloatingPoint;
 	enum canStoreUnchanged = isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string);
 }
-} else version(Have_dyaml) {} else {
+} else version(Have_dyaml_yamlserialized) {} else {
 	struct YAML {
 		enum emptyObject = "---\n...";
 		private import std.meta : AliasSeq;
