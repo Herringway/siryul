@@ -10,7 +10,7 @@
 			"name": "with-yaml",
 			"targetType": "library",
 			"dependencies": {
-				"dyaml": "~>0.5.3"
+				"dyaml-yamlserialized": "~>0.6.0"
 			}
 		},
 		{

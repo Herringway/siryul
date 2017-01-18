@@ -1,6 +1,6 @@
 module siryul.dyaml;
 private import siryul.common;
-version(Have_dyaml) {
+version(Have_dyaml_yamlserialized) {
 import dyaml.all;
 import dyaml.stream;
 private import std.range.primitives : isInfinite, isInputRange, ElementType;
@@ -167,7 +167,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!is
 		return Node(type.to!Undecorated);
 	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
 		import std.utf : toUTF8;
-		return type.toUTF8().idup.toYAML!flags;
+		return type[].toUTF8().idup.toYAML!flags;
 	} else static if(isAssociativeArray!Undecorated) {
 		Node[Node] output;
 		foreach (key, value; type)
