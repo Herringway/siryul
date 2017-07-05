@@ -110,9 +110,12 @@ package template getConvertToFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		import std.meta : AliasSeq;
 		alias getConvertToFunc = AliasSeq!(__traits(getMember, T, getUDAs!(member, CustomParser)[0].toFunc))[0];
-		static assert(arity!getConvertToFunc == 1, "Arity of conversion function must be exactly 1");
-	} else
+	} else static if (is(typeof(T.toSiryulHelper!(member.stringof)))) {
+		alias getConvertToFunc = T.toSiryulHelper!(member.stringof);
+	} else {
 		alias getConvertToFunc = (const(typeof(member)) v) { return v; };
+	}
+	static assert(arity!getConvertToFunc == 1, "Arity of conversion function must be exactly 1");
 }
 version(unittest) {
 	import std.datetime : SysTime;
@@ -126,22 +129,39 @@ version(unittest) {
 			return "this has nothing to do with time.";
 		}
 	}
+	struct TimeTest2 {
+		SysTime time;
+		string nothing;
+		static auto toSiryulHelper(string T)(SysTime) if(T == "time") {
+			return "this has nothing to do with time.";
+		}
+		static auto fromSiryulHelper(string T)(string) if (T == "time") {
+			return SysTime.min;
+		}
+	}
 }
 unittest {
 	import std.datetime : SysTime;
 	assert(getConvertToFunc!(TimeTest, TimeTest.time)(SysTime.min) == "this has nothing to do with time.");
 	assert(getConvertToFunc!(TimeTest, TimeTest.nothing)("test") == "test");
+	assert(getConvertToFunc!(TimeTest2, TimeTest2.time)(SysTime.min) == "this has nothing to do with time.");
+	assert(getConvertToFunc!(TimeTest2, TimeTest2.nothing)("test") == "test");
 }
 package template getConvertFromFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		import std.meta : AliasSeq;
 		alias getConvertFromFunc = AliasSeq!(__traits(getMember, T, getUDAs!(member, CustomParser)[0].fromFunc))[0];
-		static assert(arity!getConvertFromFunc == 1, "Arity of conversion function must be exactly 1");
-	} else
+	} else static if (is(typeof(T.fromSiryulHelper!(member.stringof)))) {
+		alias getConvertFromFunc = T.fromSiryulHelper!(member.stringof);
+	} else {
 		alias getConvertFromFunc = (typeof(member) v) { return v; };
+	}
+	static assert(arity!getConvertFromFunc == 1, "Arity of conversion function must be exactly 1");
 }
 unittest {
 	import std.datetime : SysTime;
 	assert(getConvertFromFunc!(TimeTest, TimeTest.time)("yep") == SysTime.min);
 	assert(getConvertFromFunc!(TimeTest, TimeTest.nothing)("test") == "test");
+	assert(getConvertFromFunc!(TimeTest2, TimeTest2.time)("yep") == SysTime.min);
+	assert(getConvertFromFunc!(TimeTest2, TimeTest2.nothing)("test") == "test");
 }
