@@ -17,8 +17,8 @@ struct JSON {
 		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags));
 	}
 	package static string asString(Siryulize flags, T)(T data) @trusted {
-		auto json = data.toJSON!(BitFlags!Siryulize(flags));
-		return (&json).toJSON(true);
+		const json = data.toJSON!(BitFlags!Siryulize(flags));
+		return toJSON(json, true);
 	}
 }
 
