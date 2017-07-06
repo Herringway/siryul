@@ -22,7 +22,7 @@ struct JSON {
 	}
 }
 
-private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!isInfinite!T) {
+private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue node) @trusted if (!isInfinite!T) {
 	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
 	import std.exception : enforce;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
@@ -73,6 +73,8 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (member; FieldNameTuple!T) {
+			debug enum newPath = path~"."~member;
+			else enum newPath = "";
 			alias field = AliasSeq!(__traits(getMember, output, member));
 			enum memberName = getMemberName!field;
 			static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
@@ -81,12 +83,17 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node) @trusted if (!
 			} else
 				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
 			alias fromFunc = getConvertFromFunc!(T, field);
-			static if (hasUDA!(field, IgnoreErrors)) {
-				try {
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
-				} catch (UnexpectedTypeException) {} //just skip it
-			} else {
-				__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags));
+			try {
+				static if (hasUDA!(field, IgnoreErrors)) {
+					try {
+						__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+					} catch (UnexpectedTypeException) {} //just skip it
+				} else {
+					__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+				}
+			} catch (Throwable e) {
+				e.msg = "Error deserializing "~path~":";
+				throw e;
 			}
 		}
 		return output;

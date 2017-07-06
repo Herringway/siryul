@@ -300,9 +300,9 @@ version(unittest) {
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 		}
 	}
-	void runTest2Fail(T, U)(U value) @safe {
+	void runTest2Fail(T, U)(U value, string file = __FILE__, size_t line = __LINE__) @safe {
 		foreach (siryulizer; siryulizers)
-			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer), "Expected "~siryulizer.stringof~" to throw for "~value.text~" to "~T.stringof);
+			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer), "Expected "~siryulizer.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
 	}
 	void runTest(T)(T expected) @safe {
 		runTest2(expected, expected);

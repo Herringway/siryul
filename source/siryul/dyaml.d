@@ -21,6 +21,8 @@ struct YAML {
 		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
 	}
 	package static string asString(Siryulize flags, T)(T data) {
+		debug enum path = T.stringof;
+		else enum path = "";
 		auto stream = new YMemoryStream();
 		auto dumper = Dumper(stream);
 		auto representer = new Representer;
@@ -28,7 +30,7 @@ struct YAML {
 		representer.defaultScalarStyle = ScalarStyle.Plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
-		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags))());
+		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags), path)());
 		return stream.toStr;
 	}
 }
@@ -142,7 +144,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 		throw new YAMLException(e.msg);
 	}
 }
-private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!isInfinite!T) {
+private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T type) @safe if (!isInfinite!T) {
 	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity, getUDAs, isStaticArray;
 	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.conv : text, to;
@@ -151,10 +153,11 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!is
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		return Node(type.text);
 	} else static if (isNullable!Undecorated) {
-		if (type.isNull && !(flags & Siryulize.omitNulls))
+		if (type.isNull) {
 			return Node(YAMLNull());
-		else
+		} else {
 			return type.get().toYAML!flags;
+		}
 	} else static if (is(Undecorated == SysTime)) {
 		return Node(type.to!Undecorated, "tag:yaml.org,2002:timestamp");
 	} else static if (is(Undecorated == DateTime) || is(Undecorated == Date)) {
@@ -176,12 +179,14 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!is
 	} else static if(isSimpleList!Undecorated) {
 		Node[] output;
 		foreach (value; type)
-			output ~= value.toYAML!flags;
+			output ~= value.toYAML!(flags, path);
 		return Node(output);
 	} else static if (is(Undecorated == struct)) {
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
+			debug enum newPath = path~"."~member;
+			else enum newPath = "";
 			static if (!!(flags & Siryulize.omitInits)) {
 				static if (isNullable!(typeof(__traits(getMember, type, member)))) {
 					if (__traits(getMember, type, member).isNull)
@@ -190,7 +195,21 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type) @safe if (!is
 					continue;
 			}
 			enum memberName = getMemberName!(__traits(getMember, T, member));
-			output.add(memberName, getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!flags);
+			() @trusted {
+				try {
+					auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
+					static if (!!(flags & Siryulize.omitNulls)) {
+						if (val !is null) {
+							output.add(memberName, val);
+						}
+					} else {
+						output.add(memberName, val);
+					}
+				} catch (Throwable e) {
+					e.msg = "Error serializing "~newPath~": "~e.msg;
+					throw e;
+				}
+			}();
 		}
 		return output;
 	} else
