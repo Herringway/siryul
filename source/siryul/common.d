@@ -1,8 +1,8 @@
 module siryul.common;
-import std.typecons : Nullable, NullableRef;
-import std.meta : templateAnd, templateOr, templateNot;
+import std.meta : templateAnd, templateNot, templateOr;
 import std.range : isInputRange;
-import std.traits : TemplateArgsOf, hasUDA, getUDAs, arity, TemplateOf, isSomeString, isArray, isIterable;
+import std.traits : arity, getUDAs, hasUDA, isArray, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
+import std.typecons : Nullable, NullableRef;
 ///Serialization options
 enum Siryulize {
 	none, ///Default behaviour

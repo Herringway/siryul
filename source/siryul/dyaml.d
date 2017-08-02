@@ -1,11 +1,10 @@
 module siryul.dyaml;
-private import siryul.common;
-version(Have_dyaml) {
 import dyaml;
 import dyaml.stream;
-private import std.range.primitives : isInfinite, isInputRange, ElementType;
-private import std.typecons;
-private import std.traits : isSomeChar;
+import siryul.common;
+import std.range.primitives : ElementType, isInfinite, isInputRange;
+import std.traits : isSomeChar;
+import std.typecons;
 
 /++
  + YAML (YAML Ain't Markup Language) serialization format
@@ -15,8 +14,8 @@ struct YAML {
 	package alias types = AliasSeq!(".yml", ".yaml");
 	enum emptyObject = "---\n...";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
-		import std.utf : byChar;
 		import std.conv : to;
+		import std.utf : byChar;
 		auto loader = Loader.fromString(data.byChar.to!(char[])).load();
 		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
 	}
@@ -55,12 +54,12 @@ class YAMLSException : SerializeException {
 	}
 }
 private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfinite!T) {
-	import std.traits : isSomeString, isStaticArray, isAssociativeArray, isArray, isIntegral, isFloatingPoint, FieldNameTuple, KeyType, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
-	import std.exception : enforce;
-	import std.datetime : SysTime, Date, DateTime, TimeOfDay;
-	import std.range : isOutputRange, enumerate;
 	import std.conv : to;
+	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
+	import std.exception : enforce;
 	import std.meta : AliasSeq;
+	import std.range : enumerate, isOutputRange;
+	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	if (node.isNull)
 		return T.init;
@@ -145,10 +144,10 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 	}
 }
 private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T type) @safe if (!isInfinite!T) {
-	import std.traits : Unqual, hasUDA, isSomeString, isAssociativeArray, FieldNameTuple, arity, getUDAs, isStaticArray;
-	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
 	import std.conv : text, to;
+	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.meta : AliasSeq;
+	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isAssociativeArray, isSomeString, isStaticArray, Unqual;
 	alias Undecorated = Unqual!T;
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		return Node(type.text);
@@ -216,7 +215,6 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
 }
 private template canStoreUnchanged(T) {
-	import std.traits : isIntegral, isFloatingPoint;
+	import std.traits : isFloatingPoint, isIntegral;
 	enum canStoreUnchanged = isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string);
-}
 }

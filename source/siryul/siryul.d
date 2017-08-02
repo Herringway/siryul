@@ -6,7 +6,11 @@
  +/
 module siryul.siryul;
 import siryul;
-import std.typecons, std.traits, std.range, std.meta;
+import std.datetime;
+import std.meta;
+import std.range;
+import std.traits;
+import std.typecons;
 alias siryulizers = AliasSeq!(JSON, YAML);
 
 /++
@@ -38,17 +42,17 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 				throw new SerializeException("Unknown extension");
 		}
 	} else { //Not autodetecting
-		import std.stdio : File, KeepTerminator;
 		import std.algorithm : joiner;
+		import std.stdio : File, KeepTerminator;
 		return fromString!(T, Format, flags)(File(path, "r").byLine(KeepTerminator.yes).joiner());
 	}
 }
 ///
 unittest {
-	import std.stdio : File;
-	import std.path : exists;
-	import std.file : remove;
 	import std.exception : assertThrown;
+	import std.file : remove;
+	import std.path : exists;
+	import std.stdio : File;
 	struct TestStruct {
 		string a;
 	}
@@ -156,16 +160,16 @@ alias toFormattedString = toString;
 				throw new DeserializeException("Unknown extension");
 		}
 	} else { //Not autodetecting
-		import std.stdio : File;
 		import std.algorithm : copy;
+		import std.stdio : File;
 		data.toFormattedString!(Format, flags).copy(File(path, "w").lockingTextWriter());
 	}
 }
 ///
 unittest {
+	import std.exception : assertThrown;
 	import std.file : remove;
 	import std.path : exists;
-	import std.exception : assertThrown;
 	struct TestStruct {
 		string a;
 	}
@@ -251,13 +255,13 @@ version(unittest) {
 	}
 }
 @safe unittest {
-	import std.stdio : writeln;
-	import std.algorithm : filter, canFind;
-	import std.conv : to, text;
+	import std.algorithm : canFind, filter;
+	import std.conv : text, to;
+	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : assertThrown;
 	import std.format : format;
-	import std.datetime : DateTime, SysTime, Date, TimeOfDay;
 	import std.meta : AliasSeq, Filter;
+	import std.stdio : writeln;
 	import std.traits : Fields;
 	static assert(siryulizers.length > 0);
 	struct Test {
@@ -457,10 +461,8 @@ enum ISO8601Extended;
 ///Autodetect the serialization format where possible.
 enum AutoDetect;
 package template isTimeType(T) {
-	import std.datetime;
 	enum isTimeType = is(T == DateTime) || is(T == SysTime) || is(T == TimeOfDay) || is(T == Date);
 }
-private import std.datetime;
 static assert(isTimeType!DateTime);
 static assert(isTimeType!SysTime);
 static assert(isTimeType!Date);

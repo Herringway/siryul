@@ -1,9 +1,9 @@
 module siryul.json;
 private import siryul.common;
-private import std.json : JSONValue, parseJSON, toJSON, JSON_TYPE;
-private import std.range.primitives : isInputRange, ElementType, isInfinite;
-private import std.typecons;
+private import std.json : JSONValue, JSON_TYPE, parseJSON, toJSON;
+private import std.range.primitives : ElementType, isInfinite, isInputRange;
 private import std.traits : isSomeChar;
+private import std.typecons;
 /++
  + JSON (JavaScript Object Notation) serialization format
  +
@@ -23,15 +23,14 @@ struct JSON {
 }
 
 private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue node) @trusted if (!isInfinite!T) {
-	import std.traits : isSomeString, isSomeChar, isAssociativeArray, isStaticArray, isFloatingPoint, isIntegral, FieldNameTuple, hasUDA, getUDAs, hasIndirections, ValueType, OriginalType, TemplateArgsOf, arity, Parameters, ForeachType;
+	import std.conv : text, to;
+	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
-	import std.datetime : SysTime, DateTime, Date, TimeOfDay;
-	import std.range : isOutputRange, enumerate;
-	import std.conv : to, text;
-	import std.range.primitives : front;
-	import std.utf : byCodeUnit;
-	import std.conv : to;
 	import std.meta : AliasSeq;
+	import std.range.primitives : front;
+	import std.range : enumerate, isOutputRange;
+	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, TemplateArgsOf, ValueType;
+	import std.utf : byCodeUnit;
 	static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
@@ -133,15 +132,15 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
 private void expect(T...)(JSONValue node, T types) {
-	import std.exception : enforce;
 	import std.algorithm : among;
+	import std.exception : enforce;
 	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
 }
 private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
-	import std.traits : isAssociativeArray, isArray, isSomeString, isSomeChar, FieldNameTuple, hasUDA, getUDAs, arity, Unqual, isStaticArray;
-	import std.range : isInputRange;
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
+	import std.range : isInputRange;
+	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isArray, isAssociativeArray, isSomeChar, isSomeString, isStaticArray, Unqual;
 	JSONValue output;
 	alias Undecorated = Unqual!T;
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
@@ -190,7 +189,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 	return output;
 }
 private template isTimeType(T) {
-	import std.datetime : DateTime, Date, TimeOfDay, SysTime;
+	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
 	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
 }
 private template canStoreUnchanged(T) {
@@ -208,7 +207,7 @@ class JSONDException : DeserializeException {
 class UnexpectedTypeException : JSONDException {
 	package this(JSON_TYPE expectedType, JSON_TYPE unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
-		import std.exception : ifThrown, assumeWontThrow;
+		import std.exception : assumeWontThrow, ifThrown;
 		super("Expecting JSON type "~assumeWontThrow(expectedType.text.ifThrown("Unknown"))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
 	}
 }
