@@ -12,7 +12,7 @@ private import std.typecons;
 struct JSON {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!".json";
-	enum emptyObject = "{}";
+	package enum emptyObject = "{}";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags));
 	}
@@ -38,28 +38,28 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		else
 			return node.fromJSON!(OriginalType!T, flags).to!T;
 	} else static if (isIntegral!T) {
+		expect(node, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		expect(node, JSON_TYPE.INTEGER);
 		return node.integer.to!T;
 	} else static if (isNullable!T) {
 		T output;
 		if (node.type == JSON_TYPE.NULL)
 			output.nullify();
 		else
-			output = node.fromJSON!(TemplateArgsOf!T[0], flags);
+			output = node.fromJSON!(typeof(output.get), flags);
 		return output;
 	} else static if (isFloatingPoint!T) {
+		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.STRING);
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
-		expect(node, JSON_TYPE.FLOAT);
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
+		expect(node, JSON_TYPE.STRING, JSON_TYPE.INTEGER, JSON_TYPE.NULL);
 		if (node.type == JSON_TYPE.INTEGER)
 			return node.integer.to!T;
 		if (node.type == JSON_TYPE.NULL)
 			return T.init;
-		expect(node, JSON_TYPE.STRING);
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
 		expect(node, JSON_TYPE.STRING, JSON_TYPE.NULL);
@@ -97,11 +97,10 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		}
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
+		import std.algorithm : copy, map;
 		expect(node, JSON_TYPE.ARRAY);
 		T output = new T(node.array.length);
-		size_t i;
-		foreach (JSONValue newNode; node.array)
-			output[i++] = fromJSON!(ElementType!T, flags)(newNode);
+		copy(node.array.map!(x => fromJSON!(ElementType!T, flags)(x)), output);
 		return output;
 	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
 		expect(node, JSON_TYPE.STRING);
@@ -147,10 +146,11 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		output = JSONValue(type.text);
 	} else static if (isNullable!Undecorated) {
-		if (type.isNull && !(flags & Siryulize.omitNulls))
+		if (type.isNull && !(flags & Siryulize.omitNulls)) {
 			output = JSONValue();
-		else
+		} else {
 			output = type.get().toJSON!flags;
+		}
 	} else static if (isTimeType!Undecorated) {
 		output = JSONValue(type.toISOExtString());
 	} else static if (canStoreUnchanged!Undecorated) {
@@ -163,30 +163,36 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 	} else static if (isAssociativeArray!Undecorated) {
 		string[string] arr;
 		output = JSONValue(arr);
-		foreach (key, value; type)
+		foreach (key, value; type) {
 			output.object[key.text] = value.toJSON!flags;
+		}
 	} else static if (isSimpleList!Undecorated) {
 		string[] arr;
 		output = JSONValue(arr);
-		foreach (value; type)
+		foreach (value; type) {
 			output.array ~= value.toJSON!flags;
+		}
 	} else static if (is(Undecorated == struct)) {
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
 			static if (!!(flags & Siryulize.omitInits)) {
 				static if (isNullable!(typeof(__traits(getMember, T, member)))) {
-					if (__traits(getMember, type, member).isNull)
+					if (__traits(getMember, type, member).isNull) {
 						continue;
-				} else
-					if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
+					}
+				} else {
+					if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
 						continue;
+					}
+				}
 			}
 			enum memberName = getMemberName!(__traits(getMember, T, member));
 			output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
 		}
-	} else
+	} else {
 		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
+	}
 	return output;
 }
 private template isTimeType(T) {
