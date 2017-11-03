@@ -12,7 +12,7 @@ import std.typecons;
 struct YAML {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!(".yml", ".yaml");
-	enum emptyObject = "---\n...";
+	package enum emptyObject = "---\n...";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.utf : byChar;
@@ -41,7 +41,7 @@ private @property string toStr(YMemoryStream stream) @trusted {
  + Thrown on YAML deserialization errors
  +/
 class YAMLDException : DeserializeException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
 }
@@ -49,7 +49,7 @@ class YAMLDException : DeserializeException {
  + Thrown on YAML serialization errors
  +/
 class YAMLSException : SerializeException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
 }
@@ -65,7 +65,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 		return T.init;
 	try {
 		static if (is(T == enum)) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			else
@@ -73,25 +73,25 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 		} else static if (isNullable!T) {
 			return node.isNull ? T.init : T(node.fromYAML!(TemplateArgsOf!T[0], flags));
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			static if (isIntegral!T)
-				enforce(node.tag == `tag:yaml.org,2002:int`, new YAMLException("Attempted to read a float as an integer"));
+				enforce!YAMLDException(node.tag == `tag:yaml.org,2002:int`, "Attempted to read a float as an integer");
 			static if (isSomeString!T)
-				enforce(node.tag != `tag:yaml.org,2002:bool`, new YAMLException("Attempted to read a non-string as a string"));
+				enforce!YAMLDException(node.tag != `tag:yaml.org,2002:bool`, "Attempted to read a non-string as a string");
 			return node.get!T;
 		} else static if (isSomeChar!T) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			return node.get!(T[])[0];
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			return node.get!SysTime.to!T;
 		} else static if (is(T == TimeOfDay)) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			return TimeOfDay.fromISOExtString(node.get!string);
 		} else static if (is(T == struct)) {
-			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
+			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
 			foreach (member; FieldNameTuple!T) {
 				enum memberName = getMemberName!(__traits(getMember, T, member));
@@ -99,48 +99,48 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 					if (!node.containsKey(memberName))
 						continue;
 				} else
-					enforce(node.containsKey(memberName), new YAMLException("Missing non-@Optional "~memberName~" in node"));
+					enforce!YAMLDException(node.containsKey(memberName), "Missing non-@Optional "~memberName~" in node");
 				alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
 				static if (hasUDA!(__traits(getMember, T, member), IgnoreErrors)) {
 					try {
 						__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
-					} catch (YAMLException) {}
+					} catch (YAMLDException) {}
 				} else
 					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
-			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
+			enforce!YAMLDException(node.isSequence(), "Attempted to read a non-sequence as a "~T.stringof);
 			T output;
 			foreach (Node newNode; node)
 				output ~= fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
-			enforce(node.isScalar(), new YAMLException("Attempted to read a non-scalar as a "~T.stringof));
+			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			T output;
 			foreach (i, chr; node.fromYAML!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
 				output[i] = chr;
 			return output;
 		} else static if(isStaticArray!T) {
-			enforce(node.isSequence(), new YAMLException("Attempted to read a non-sequence as a "~T.stringof));
+			enforce!YAMLDException(node.isSequence(), "Attempted to read a non-sequence as a "~T.stringof);
 			T output;
 			size_t i;
 			foreach (Node newNode; node)
 				output[i++] = fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if(isAssociativeArray!T) {
-			enforce(node.isMapping(), new YAMLException("Attempted to read a non-mapping as a "~T.stringof));
+			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
 			foreach (Node key, Node value; node)
 				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);
 			return output;
 		} else static if (is(T == bool)) {
-			enforce(node.tag == `tag:yaml.org,2002:bool`, new YAMLException("Expecting a boolean value"));
+			enforce!YAMLDException(node.tag == `tag:yaml.org,2002:bool`, "Expecting a boolean value");
 			return node.get!T;
 		} else
 			static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
 	} catch (NodeException e) {
-		throw new YAMLException(e.msg);
+		throw new YAMLDException(e.msg);
 	}
 }
 private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T type) @safe if (!isInfinite!T) {
@@ -190,8 +190,11 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 				static if (isNullable!(typeof(__traits(getMember, type, member)))) {
 					if (__traits(getMember, type, member).isNull)
 						continue;
-				} else if (__traits(getMember, type, member) == __traits(getMember, type, member).init)
-					continue;
+				} else {
+					if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
+						continue;
+					}
+				}
 			}
 			enum memberName = getMemberName!(__traits(getMember, T, member));
 			() @trusted {
@@ -204,7 +207,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 					} else {
 						output.add(memberName, val);
 					}
-				} catch (Throwable e) {
+				} catch (Exception e) {
 					e.msg = "Error serializing "~newPath~": "~e.msg;
 					throw e;
 				}
