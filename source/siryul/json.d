@@ -80,7 +80,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
 					continue;
 			} else
-				enforce(memberName in node.object, new JSONDException("Missing non-@Optional "~memberName~" in node"));
+				enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
 			alias fromFunc = getConvertFromFunc!(T, field);
 			try {
 				static if (hasUDA!(field, IgnoreErrors)) {
@@ -90,7 +90,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 				} else {
 					__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
 				}
-			} catch (Throwable e) {
+			} catch (Exception e) {
 				e.msg = "Error deserializing "~path~":";
 				throw e;
 			}
@@ -111,7 +111,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		return output;
 	} else static if(isStaticArray!T) {
 		expect(node, JSON_TYPE.ARRAY);
-		enforce(node.array.length == T.length, new JSONDException("Static array length mismatch"));
+		enforce!JSONDException(node.array.length == T.length, "Static array length mismatch");
 		T output;
 		foreach (i, JSONValue newNode; node.array)
 			output[i] = fromJSON!(ForeachType!T, flags)(newNode);
@@ -123,11 +123,12 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 			output[key] = fromJSON!(ValueType!T, flags)(value);
 		return output;
 	} else static if (is(T == bool)) {
+		expect(node, JSON_TYPE.TRUE, JSON_TYPE.FALSE);
 		if (node.type == JSON_TYPE.TRUE)
 			return true;
 		else if (node.type == JSON_TYPE.FALSE)
 			return false;
-		throw new JSONDException("Expecting true/false, got "~node.type.text);
+		assert(false);
 	} else
 		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
 }
@@ -200,10 +201,13 @@ private template canStoreUnchanged(T) {
  + Thrown on JSON deserialization errors
  +/
 class JSONDException : DeserializeException {
-	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
 }
+/++
++ Thrown when a JSON value has an unexpected type.
++/
 class UnexpectedTypeException : JSONDException {
 	package this(JSON_TYPE expectedType, JSON_TYPE unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
