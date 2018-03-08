@@ -50,8 +50,7 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 ///
 unittest {
 	import std.exception : assertThrown;
-	import std.file : remove;
-	import std.path : exists;
+	import std.file : exists, remove;
 	import std.stdio : File;
 	struct TestStruct {
 		string a;
@@ -168,8 +167,7 @@ alias toFormattedString = toString;
 ///
 unittest {
 	import std.exception : assertThrown;
-	import std.file : remove;
-	import std.path : exists;
+	import std.file : exists, remove;
 	struct TestStruct {
 		string a;
 	}
