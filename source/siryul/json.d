@@ -72,27 +72,29 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (member; FieldNameTuple!T) {
-			debug enum newPath = path~"."~member;
-			else enum newPath = "";
-			alias field = AliasSeq!(__traits(getMember, output, member));
-			enum memberName = getMemberName!field;
-			static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
-				if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
-					continue;
-			} else
-				enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
-			alias fromFunc = getConvertFromFunc!(T, field);
-			try {
-				static if (hasUDA!(field, IgnoreErrors)) {
-					try {
+			static if (__traits(compiles, __traits(getMember, output, member))) {
+				debug enum newPath = path~"."~member;
+				else enum newPath = "";
+				alias field = AliasSeq!(__traits(getMember, output, member));
+				enum memberName = getMemberName!field;
+				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
+					if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
+						continue;
+				} else
+					enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
+				alias fromFunc = getConvertFromFunc!(T, field);
+				try {
+					static if (hasUDA!(field, IgnoreErrors)) {
+						try {
+							__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+						} catch (UnexpectedTypeException) {} //just skip it
+					} else {
 						__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
-					} catch (UnexpectedTypeException) {} //just skip it
-				} else {
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+					}
+				} catch (Exception e) {
+					e.msg = "Error deserializing "~path~":";
+					throw e;
 				}
-			} catch (Exception e) {
-				e.msg = "Error deserializing "~path~":";
-				throw e;
 			}
 		}
 		return output;
@@ -176,19 +178,21 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
-			static if (!!(flags & Siryulize.omitInits)) {
-				static if (isNullable!(typeof(__traits(getMember, T, member)))) {
-					if (__traits(getMember, type, member).isNull) {
-						continue;
-					}
-				} else {
-					if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
-						continue;
+			static if (__traits(compiles, getMemberName!(__traits(getMember, T, member)))) {
+				static if (!!(flags & Siryulize.omitInits)) {
+					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
+						if (__traits(getMember, type, member).isNull) {
+							continue;
+						}
+					} else {
+						if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
+							continue;
+						}
 					}
 				}
+				enum memberName = getMemberName!(__traits(getMember, T, member));
+				output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
 			}
-			enum memberName = getMemberName!(__traits(getMember, T, member));
-			output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
 		}
 	} else {
 		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully

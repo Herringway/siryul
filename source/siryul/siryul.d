@@ -442,6 +442,13 @@ version(unittest) {
 	//string -> bool???
 	runTest2Fail!bool("nah");
 
+	struct PrivateTest {
+		private uint x;
+		bool y;
+	}
+
+	runTest(PrivateTest(0,true));
+
 	struct IgnoreErrBad {
 		float n = 1.2;
 	}

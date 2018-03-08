@@ -94,19 +94,21 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
 			foreach (member; FieldNameTuple!T) {
-				enum memberName = getMemberName!(__traits(getMember, T, member));
-				static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
-					if (!node.containsKey(memberName))
-						continue;
-				} else
-					enforce!YAMLDException(node.containsKey(memberName), "Missing non-@Optional "~memberName~" in node");
-				alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
-				static if (hasUDA!(__traits(getMember, T, member), IgnoreErrors)) {
-					try {
+				static if (__traits(compiles, __traits(getMember, output, member))) {
+					enum memberName = getMemberName!(__traits(getMember, T, member));
+					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+						if (!node.containsKey(memberName))
+							continue;
+					} else
+						enforce!YAMLDException(node.containsKey(memberName), "Missing non-@Optional "~memberName~" in node");
+					alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
+					static if (hasUDA!(__traits(getMember, T, member), IgnoreErrors)) {
+						try {
+							__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+						} catch (YAMLDException) {}
+					} else
 						__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
-					} catch (YAMLDException) {}
-				} else
-					__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+				}
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
@@ -184,34 +186,36 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!T) {
-			debug enum newPath = path~"."~member;
-			else enum newPath = "";
-			static if (!!(flags & Siryulize.omitInits)) {
-				static if (isNullable!(typeof(__traits(getMember, type, member)))) {
-					if (__traits(getMember, type, member).isNull)
-						continue;
-				} else {
-					if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
-						continue;
+			static if (__traits(compiles, getMemberName!(__traits(getMember, T, member)))) {
+				debug enum newPath = path~"."~member;
+				else enum newPath = "";
+				static if (!!(flags & Siryulize.omitInits)) {
+					static if (isNullable!(typeof(__traits(getMember, type, member)))) {
+						if (__traits(getMember, type, member).isNull)
+							continue;
+					} else {
+						if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
+							continue;
+						}
 					}
 				}
-			}
-			enum memberName = getMemberName!(__traits(getMember, T, member));
-			() @trusted {
-				try {
-					auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
-					static if (!!(flags & Siryulize.omitNulls)) {
-						if (val !is null) {
+				enum memberName = getMemberName!(__traits(getMember, T, member));
+				() @trusted {
+					try {
+						auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
+						static if (!!(flags & Siryulize.omitNulls)) {
+							if (val !is null) {
+								output.add(memberName, val);
+							}
+						} else {
 							output.add(memberName, val);
 						}
-					} else {
-						output.add(memberName, val);
+					} catch (Exception e) {
+						e.msg = "Error serializing "~newPath~": "~e.msg;
+						throw e;
 					}
-				} catch (Exception e) {
-					e.msg = "Error serializing "~newPath~": "~e.msg;
-					throw e;
-				}
-			}();
+				}();
+			}
 		}
 		return output;
 	} else
