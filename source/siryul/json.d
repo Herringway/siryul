@@ -13,16 +13,16 @@ struct JSON {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!".json";
 	package enum emptyObject = "{}";
-	package static T parseInput(T, DeSiryulize flags, U)(U data) @trusted if (isInputRange!U && isSomeChar!(ElementType!U)) {
+	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags));
 	}
-	package static string asString(Siryulize flags, T)(T data) @trusted {
+	package static string asString(Siryulize flags, T)(T data) {
 		const json = data.toJSON!(BitFlags!Siryulize(flags));
 		return toJSON(json, true);
 	}
 }
 
-private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue node) @trusted if (!isInfinite!T) {
+private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue node) if (!isInfinite!T) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
@@ -138,7 +138,7 @@ private void expect(T...)(JSONValue node, T types) {
 	import std.exception : enforce;
 	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
 }
-private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) @trusted if (!isInfinite!T) {
+private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isInfinite!T) {
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
 	import std.range : isInputRange;

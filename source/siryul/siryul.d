@@ -252,7 +252,7 @@ version(unittest) {
 		}
 	}
 }
-@safe unittest {
+@system unittest {
 	import std.algorithm : canFind, filter;
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
@@ -274,19 +274,16 @@ version(unittest) {
 		char i;
 	}
 	alias SkipImmutable = Flag!"SkipImmutable";
-	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(T input, U expected) @safe {
+	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(auto ref T input, auto ref U expected) {
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
 			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
 			static if (flag == SkipImmutable.no) {
-				///Awkward workaround to avoid immutable/const casts in @safe.
-				auto result = () @trusted {
-					return tuple(cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer),
+				auto result = tuple(cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer),
 					(cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer),
 					cast(immutable)expected,
 					cast(const)expected);
-				}();
 				immutable immutableTest = result[0];
 				immutable immutableExpected = result[2];
 				const constTest = result[1];
@@ -302,14 +299,14 @@ version(unittest) {
 			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 		}
 	}
-	void runTest2Fail(T, U)(U value, string file = __FILE__, size_t line = __LINE__) @safe {
+	void runTest2Fail(T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
 		foreach (siryulizer; siryulizers)
 			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer), "Expected "~siryulizer.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
 	}
-	void runTest(T)(T expected) @safe {
+	void runTest(T)(auto ref T expected) {
 		runTest2(expected, expected);
 	}
-	void runTestFail(T)(T expected) @safe {
+	void runTestFail(T)(auto ref T expected) {
 		runTest2Fail!T(expected);
 	}
 	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');

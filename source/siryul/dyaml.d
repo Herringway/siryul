@@ -33,7 +33,7 @@ struct YAML {
 		return stream.toStr;
 	}
 }
-private @property string toStr(YMemoryStream stream) @trusted {
+private @property string toStr(YMemoryStream stream) {
 	import std.string : assumeUTF;
 	return assumeUTF(stream.data);
 }
@@ -53,7 +53,7 @@ class YAMLSException : SerializeException {
 		super(msg, file, line);
 	}
 }
-private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfinite!T) {
+private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) {
 	import std.conv : to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
@@ -145,7 +145,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) @safe if (!isInfini
 		throw new YAMLDException(e.msg);
 	}
 }
-private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T type) @safe if (!isInfinite!T) {
+private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T type) if (!isInfinite!T) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.meta : AliasSeq;
@@ -200,21 +200,19 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 					}
 				}
 				enum memberName = getMemberName!(__traits(getMember, T, member));
-				() @trusted {
-					try {
-						auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
-						static if (!!(flags & Siryulize.omitNulls)) {
-							if (val !is null) {
-								output.add(memberName, val);
-							}
-						} else {
+				try {
+					auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
+					static if (!!(flags & Siryulize.omitNulls)) {
+						if (val !is null) {
 							output.add(memberName, val);
 						}
-					} catch (Exception e) {
-						e.msg = "Error serializing "~newPath~": "~e.msg;
-						throw e;
+					} else {
+						output.add(memberName, val);
 					}
-				}();
+				} catch (Exception e) {
+					e.msg = "Error serializing "~newPath~": "~e.msg;
+					throw e;
+				}
 			}
 		}
 		return output;
