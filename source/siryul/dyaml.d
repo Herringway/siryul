@@ -59,7 +59,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 	import std.exception : enforce;
 	import std.meta : AliasSeq;
 	import std.range : enumerate, isOutputRange;
-	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, TemplateArgsOf, ValueType;
+	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	if (node.isNull)
 		return T.init;
@@ -90,9 +90,12 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 		} else static if (is(T == TimeOfDay)) {
 			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			return TimeOfDay.fromISOExtString(node.get!string);
-		} else static if (is(T == struct)) {
+		} else static if (is(T == struct)  || (isPointer!T && is(PointerTarget!T == struct))) {
 			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
+			static if (isPointer!T) {
+				output = new PointerTarget!T;
+			}
 			foreach (member; FieldNameTuple!T) {
 				static if (__traits(compiles, __traits(getMember, output, member))) {
 					enum memberName = getMemberName!(__traits(getMember, T, member));
@@ -149,8 +152,12 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.meta : AliasSeq;
-	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isAssociativeArray, isSomeString, isStaticArray, Unqual;
-	alias Undecorated = Unqual!T;
+	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
+	static if (isPointer!T) {
+		alias Undecorated = Unqual!(PointerTarget!T);
+	} else {
+		alias Undecorated = Unqual!T;
+	}
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		return Node(type.text);
 	} else static if (isNullable!Undecorated) {

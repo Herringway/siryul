@@ -29,7 +29,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 	import std.meta : AliasSeq;
 	import std.range.primitives : front;
 	import std.range : enumerate, isOutputRange;
-	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, TemplateArgsOf, ValueType;
+	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	static if (is(T == enum)) {
 		import std.conv : to;
@@ -68,9 +68,12 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		return T.fromISOExtString(node.fromJSON!(string, flags));
-	} else static if (is(T == struct)) {
+	} else static if (is(T == struct) || (isPointer!T && is(PointerTarget!T == struct))) {
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
+		static if (isPointer!T) {
+			output = new PointerTarget!T;
+		}
 		foreach (member; FieldNameTuple!T) {
 			static if (__traits(compiles, __traits(getMember, output, member))) {
 				debug enum newPath = path~"."~member;
@@ -142,9 +145,13 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
 	import std.range : isInputRange;
-	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isArray, isAssociativeArray, isSomeChar, isSomeString, isStaticArray, Unqual;
+	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isArray, isAssociativeArray, isPointer, isSomeChar, isSomeString, isStaticArray, PointerTarget, Unqual;
 	JSONValue output;
-	alias Undecorated = Unqual!T;
+	static if (isPointer!T) {
+		alias Undecorated = Unqual!(PointerTarget!T);
+	} else {
+		alias Undecorated = Unqual!T;
+	}
 	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		output = JSONValue(type.text);
 	} else static if (isNullable!Undecorated) {

@@ -275,28 +275,36 @@ version(unittest) {
 	}
 	alias SkipImmutable = Flag!"SkipImmutable";
 	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(auto ref T input, auto ref U expected) {
+		import std.traits : isPointer;
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
 			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
 			static if (flag == SkipImmutable.no) {
-				auto result = tuple(cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer),
-					(cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer),
-					cast(immutable)expected,
-					cast(const)expected);
-				immutable immutableTest = result[0];
-				immutable immutableExpected = result[2];
-				const constTest = result[1];
-				const constExpected = result[3];
+				immutable immutableTest = cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+				immutable immutableExpected = cast(immutable)expected;
+				const constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+				const constExpected = cast(const)expected;
 			}
-			auto vals = format("expected %s, got %s", expected, gotYAMLValue);
-			auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
-			assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-			static if (flag == SkipImmutable.no) {
-				assert(constTest == constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				assert(immutableTest == immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+			static if (isPointer!T && isPointer!U) {
+				auto vals = format("expected %s, got %s", *expected, *gotYAMLValue);
+				auto valsOmit = format("expected %s, got %s", *expected, *gotYAMLValueOmit);
+				assert(*gotYAMLValue == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				static if (flag == SkipImmutable.no) {
+					assert(*constTest == *constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+					assert(*immutableTest == *immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				}
+				assert(*gotYAMLValueOmit == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
+			} else {
+				auto vals = format("expected %s, got %s", expected, gotYAMLValue);
+				auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
+				assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				static if (flag == SkipImmutable.no) {
+					assert(constTest == constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+					assert(immutableTest == immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
+				}
+				assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 			}
-			assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 		}
 	}
 	void runTest2Fail(T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
@@ -454,6 +462,12 @@ version(unittest) {
 	}
 	foreach (siryulizer; siryulizers)
 		assert(IgnoreErrBad().toString!siryulizer.fromString!(IgnoreErrGood, siryulizer).n == IgnoreErrGood.init.n, "IgnoreErrors test failed for "~siryulizer.stringof);
+
+	struct StructPtr {
+		ubyte[100] bytes;
+	}
+	StructPtr* structPtr = new StructPtr;
+	runTest(structPtr);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
