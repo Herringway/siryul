@@ -286,6 +286,19 @@ version(unittest) {
 				const constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
 				const constExpected = cast(const)expected;
 			}
+			debug(verbosetesting) {
+				static if (isPointer!T) {
+					writeln("Input:\n ", *input);
+				} else {
+					writeln("Input:\n ", input);
+				}
+				writeln("Serialized:\n", input.toFormattedString!siryulizer);
+				static if (isPointer!T) {
+					writeln("Output:\n ", *gotYAMLValue);
+				} else {
+					writeln("Output:\n ", gotYAMLValue);
+				}
+			}
 			static if (isPointer!T && isPointer!U) {
 				auto vals = format("expected %s, got %s", *expected, *gotYAMLValue);
 				auto valsOmit = format("expected %s, got %s", *expected, *gotYAMLValueOmit);
