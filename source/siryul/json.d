@@ -73,18 +73,22 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		T output;
 		static if (isPointer!T) {
 			output = new PointerTarget!T;
+			alias Undecorated = PointerTarget!T;
+		} else {
+			alias Undecorated = T;
 		}
-		foreach (member; FieldNameTuple!T) {
-			static if (__traits(compiles, __traits(getMember, output, member))) {
+		foreach (member; FieldNameTuple!Undecorated) {
+			static if (__traits(compiles, __traits(getMember, Undecorated, member))) {
 				debug enum newPath = path~"."~member;
 				else enum newPath = "";
-				alias field = AliasSeq!(__traits(getMember, output, member));
+				alias field = AliasSeq!(__traits(getMember, Undecorated, member));
 				enum memberName = getMemberName!field;
 				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
 					if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
 						continue;
-				} else
+				} else {
 					enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
+				}
 				alias fromFunc = getConvertFromFunc!(T, field);
 				try {
 					static if (hasUDA!(field, IgnoreErrors)) {
@@ -184,8 +188,8 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 	} else static if (is(Undecorated == struct)) {
 		string[string] arr;
 		output = JSONValue(arr);
-		foreach (member; FieldNameTuple!T) {
-			static if (__traits(compiles, getMemberName!(__traits(getMember, T, member)))) {
+		foreach (member; FieldNameTuple!Undecorated) {
+			static if (__traits(compiles, getMemberName!(__traits(getMember, Undecorated, member)))) {
 				static if (!!(flags & Siryulize.omitInits)) {
 					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
 						if (__traits(getMember, type, member).isNull) {
@@ -197,8 +201,8 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 						}
 					}
 				}
-				enum memberName = getMemberName!(__traits(getMember, T, member));
-				output.object[memberName] = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toJSON!flags;
+				enum memberName = getMemberName!(__traits(getMember, Undecorated, member));
+				output.object[memberName] = getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)).toJSON!flags;
 			}
 		}
 	} else {

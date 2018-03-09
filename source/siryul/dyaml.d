@@ -95,17 +95,22 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 			T output;
 			static if (isPointer!T) {
 				output = new PointerTarget!T;
+				alias Undecorated = PointerTarget!T;
+			} else {
+				alias Undecorated = T;
 			}
-			foreach (member; FieldNameTuple!T) {
-				static if (__traits(compiles, __traits(getMember, output, member))) {
-					enum memberName = getMemberName!(__traits(getMember, T, member));
-					static if (hasUDA!(__traits(getMember, T, member), Optional) || hasIndirections!(typeof(__traits(getMember, T, member)))) {
+			foreach (member; FieldNameTuple!Undecorated) {
+				static if (__traits(compiles, __traits(getMember, Undecorated, member))) {
+					alias field = AliasSeq!(__traits(getMember, Undecorated, member));
+					enum memberName = getMemberName!field;
+					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
 						if (!node.containsKey(memberName))
 							continue;
-					} else
+					} else {
 						enforce!YAMLDException(node.containsKey(memberName), "Missing non-@Optional "~memberName~" in node");
-					alias fromFunc = getConvertFromFunc!(T, __traits(getMember, output, member));
-					static if (hasUDA!(__traits(getMember, T, member), IgnoreErrors)) {
+					}
+					alias fromFunc = getConvertFromFunc!(T, __traits(getMember, Undecorated, member));
+					static if (hasUDA!(__traits(getMember, Undecorated, member), IgnoreErrors)) {
 						try {
 							__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
 						} catch (YAMLDException) {}
@@ -192,8 +197,8 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 	} else static if (is(Undecorated == struct)) {
 		static string[] empty;
 		Node output = Node(empty, empty);
-		foreach (member; FieldNameTuple!T) {
-			static if (__traits(compiles, getMemberName!(__traits(getMember, T, member)))) {
+		foreach (member; FieldNameTuple!Undecorated) {
+			static if (__traits(compiles, getMemberName!(__traits(getMember, Undecorated, member)))) {
 				debug enum newPath = path~"."~member;
 				else enum newPath = "";
 				static if (!!(flags & Siryulize.omitInits)) {
@@ -206,9 +211,9 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 						}
 					}
 				}
-				enum memberName = getMemberName!(__traits(getMember, T, member));
+				enum memberName = getMemberName!(__traits(getMember, Undecorated, member));
 				try {
-					auto val = getConvertToFunc!(T, __traits(getMember, type, member))(__traits(getMember, type, member)).toYAML!(flags, newPath);
+					auto val = getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)).toYAML!(flags, newPath);
 					static if (!!(flags & Siryulize.omitNulls)) {
 						if (val !is null) {
 							output.add(memberName, val);

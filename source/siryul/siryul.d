@@ -468,6 +468,8 @@ version(unittest) {
 	}
 	StructPtr* structPtr = new StructPtr;
 	runTest(structPtr);
+	structPtr.bytes[0] = 1;
+	runTest(structPtr);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
