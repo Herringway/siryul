@@ -64,7 +64,9 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 	if (node.isNull)
 		return T.init;
 	try {
-		static if (is(T == enum)) {
+		static if (is(T == struct) && hasDeserializationMethod!T) {
+			return deserializationMethod!T(fromYAML!(Parameters!(deserializationMethod!T), flags)(node));
+		} else static if (is(T == enum)) {
 			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
@@ -157,13 +159,15 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.meta : AliasSeq;
-	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
+	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
 	static if (isPointer!T) {
 		alias Undecorated = Unqual!(PointerTarget!T);
 	} else {
 		alias Undecorated = Unqual!T;
 	}
-	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
+	static if (is(T == struct) && hasSerializationMethod!T) {
+		return toYAML!flags(mixin("type."~__traits(identifier, serializationMethod!T)));
+	} else static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		return Node(type.text);
 	} else static if (isNullable!Undecorated) {
 		if (type.isNull) {

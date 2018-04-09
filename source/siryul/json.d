@@ -31,7 +31,9 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 	import std.range : enumerate, isOutputRange;
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
-	static if (is(T == enum)) {
+	static if (is(T == struct) && hasDeserializationMethod!T) {
+		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags)(node));
+	} else static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
@@ -149,14 +151,16 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 	import std.conv : text, to;
 	import std.meta : AliasSeq;
 	import std.range : isInputRange;
-	import std.traits : arity, FieldNameTuple, getUDAs, hasUDA, isArray, isAssociativeArray, isPointer, isSomeChar, isSomeString, isStaticArray, PointerTarget, Unqual;
+	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isPointer, isSomeChar, isSomeString, isStaticArray, PointerTarget, Unqual;
 	JSONValue output;
 	static if (isPointer!T) {
 		alias Undecorated = Unqual!(PointerTarget!T);
 	} else {
 		alias Undecorated = Unqual!T;
 	}
-	static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
+	static if (is(T == struct) && hasSerializationMethod!T) {
+		output = toJSON!flags(mixin("type."~__traits(identifier, serializationMethod!T)));
+	} else static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
 		output = JSONValue(type.text);
 	} else static if (isNullable!Undecorated) {
 		if (type.isNull && !(flags & Siryulize.omitNulls)) {

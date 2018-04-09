@@ -1,7 +1,7 @@
 module siryul.common;
 import std.meta : templateAnd, templateNot, templateOr;
 import std.range : isInputRange;
-import std.traits : arity, getUDAs, hasUDA, isArray, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
+import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
 import std.typecons : Nullable, NullableRef;
 ///Serialization options
 enum Siryulize {
@@ -84,6 +84,15 @@ enum AsString;
 enum AsBinary;
 ///Errors are ignored; value will be .init
 enum IgnoreErrors;
+///Marks a method for use in serialization
+enum SerializationMethod;
+///Marks a method for use in deserialization
+enum DeserializationMethod;
+
+enum hasSerializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod).length == 1;
+alias serializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod)[0];
+enum hasDeserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod).length == 1;
+alias deserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod)[0];
 
 alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString);
 static assert(isSimpleList!(int[]));

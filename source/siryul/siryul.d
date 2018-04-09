@@ -483,6 +483,19 @@ version(unittest) {
 	runTest(structPtr);
 	structPtr.bytes[0] = 1;
 	runTest(structPtr);
+
+	static struct CustomSerializer {
+		bool x;
+		@SerializationMethod
+		bool serialize() const @safe {
+			return !x;
+		}
+		@DeserializationMethod
+		static auto deserialize(bool input) @safe {
+			return CustomSerializer(!input);
+		}
+	}
+	runTest2(CustomSerializer(true), false);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
