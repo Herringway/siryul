@@ -219,13 +219,16 @@ private @property Node toYAML(BitFlags!Siryulize flags, string path = "", T)(T t
 				}
 				enum memberName = getMemberName!(__traits(getMember, Undecorated, member));
 				try {
-					auto val = getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)).toYAML!(flags, newPath);
-					static if (!!(flags & Siryulize.omitNulls)) {
-						if (val !is null) {
-							output.add(memberName, val);
+					static if (isPointer!(typeof(mixin("type."~member))) && !!(flags & Siryulize.omitNulls)) {
+						if (mixin("type."~member) is null) {
+							continue;
 						}
-					} else {
+					}
+					static if (hasConvertToFunc!(T, __traits(getMember, Undecorated, member))) {
+						auto val = getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)).toYAML!(flags, newPath);
 						output.add(memberName, val);
+					} else {
+						output.add(memberName, mixin("type."~member).toYAML!(flags, newPath));
 					}
 				} catch (Exception e) {
 					e.msg = "Error serializing "~newPath~": "~e.msg;

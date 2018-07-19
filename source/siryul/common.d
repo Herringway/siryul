@@ -115,6 +115,15 @@ unittest {
 	assert(getMemberName!(__traits(getMember, TestStruct, "something")) == "something");
 	assert(getMemberName!(__traits(getMember, TestStruct, "somethingElse")) == "Test");
 }
+template hasConvertToFunc(T, alias member) {
+	static if (hasUDA!(member, CustomParser)) {
+		enum hasConvertToFunc = true;
+	} else static if (is(typeof(T.toSiryulHelper!(member.stringof)))) {
+		enum hasConvertToFunc = true;
+	} else {
+		enum hasConvertToFunc = false;
+	}
+}
 package template getConvertToFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		import std.meta : AliasSeq;
