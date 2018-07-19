@@ -14,7 +14,7 @@ struct JSON {
 	package alias types = AliasSeq!".json";
 	package enum emptyObject = "{}";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
-		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags));
+		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags), T.stringof);
 	}
 	package static string asString(Siryulize flags, T)(T data) {
 		const json = data.toJSON!(BitFlags!Siryulize(flags));
@@ -32,13 +32,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	static if (is(T == struct) && hasDeserializationMethod!T) {
-		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags)(node));
+		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags, path)(node));
 	} else static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
 		else
-			return node.fromJSON!(OriginalType!T, flags).to!T;
+			return node.fromJSON!(OriginalType!T, flags, path).to!T;
 	} else static if (isIntegral!T) {
 		expect(node, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
 		if (node.type == JSON_TYPE.STRING)
@@ -49,7 +49,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		if (node.type == JSON_TYPE.NULL)
 			output.nullify();
 		else
-			output = node.fromJSON!(typeof(output.get), flags);
+			output = node.fromJSON!(typeof(output.get), flags, path);
 		return output;
 	} else static if (isFloatingPoint!T) {
 		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.STRING);
@@ -69,7 +69,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 			return T.init;
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
-		return T.fromISOExtString(node.fromJSON!(string, flags));
+		return T.fromISOExtString(node.fromJSON!(string, flags, path));
 	} else static if (is(T == struct) || (isPointer!T && is(PointerTarget!T == struct))) {
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
@@ -111,12 +111,12 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		import std.algorithm : copy, map;
 		expect(node, JSON_TYPE.ARRAY);
 		T output = new T(node.array.length);
-		copy(node.array.map!(x => fromJSON!(ElementType!T, flags)(x)), output);
+		copy(node.array.map!(x => fromJSON!(ElementType!T, flags, path)(x)), output);
 		return output;
 	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
 		expect(node, JSON_TYPE.STRING);
 		T output;
-		foreach (i, chr; node.fromJSON!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
+		foreach (i, chr; node.fromJSON!((ForeachType!T)[], flags, path).byCodeUnit.enumerate(0))
 			output[i] = chr;
 		return output;
 	} else static if(isStaticArray!T) {
@@ -124,13 +124,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		enforce!JSONDException(node.array.length == T.length, "Static array length mismatch");
 		T output;
 		foreach (i, JSONValue newNode; node.array)
-			output[i] = fromJSON!(ForeachType!T, flags)(newNode);
+			output[i] = fromJSON!(ForeachType!T, flags, path)(newNode);
 		return output;
 	} else static if(isAssociativeArray!T) {
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (string key, JSONValue value; node.object)
-			output[key] = fromJSON!(ValueType!T, flags)(value);
+			output[key] = fromJSON!(ValueType!T, flags, path)(value);
 		return output;
 	} else static if (is(T == bool)) {
 		expect(node, JSON_TYPE.TRUE, JSON_TYPE.FALSE);
