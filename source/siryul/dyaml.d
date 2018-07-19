@@ -1,6 +1,5 @@
 module siryul.dyaml;
 import dyaml;
-import dyaml.stream;
 import siryul.common;
 import std.range.primitives : ElementType, isInfinite, isInputRange;
 import std.traits : isSomeChar;
@@ -16,26 +15,24 @@ struct YAML {
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.utf : byChar;
-		auto loader = Loader.fromString(data.byChar.to!(char[])).load();
+		auto str = data.byChar.to!(char[]);
+		auto loader = Loader.fromString(str).load();
 		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
 	}
 	package static string asString(Siryulize flags, T)(T data) {
+		import std.array : appender;
 		debug enum path = T.stringof;
 		else enum path = "";
-		auto stream = new YMemoryStream();
-		auto dumper = Dumper(stream);
+		auto buf = appender!string;
+		auto dumper = dumper(buf);
 		auto representer = new Representer;
 		representer.defaultCollectionStyle = CollectionStyle.Block;
 		representer.defaultScalarStyle = ScalarStyle.Plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
 		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags), path)());
-		return stream.toStr;
+		return buf.data;
 	}
-}
-private @property string toStr(YMemoryStream stream) {
-	import std.string : assumeUTF;
-	return assumeUTF(stream.data);
 }
 /++
  + Thrown on YAML deserialization errors
@@ -78,14 +75,19 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
-			static if (isIntegral!T)
+			static if (isIntegral!T) {
 				enforce!YAMLDException(node.tag == `tag:yaml.org,2002:int`, "Attempted to read a float as an integer");
-			static if (isSomeString!T)
+				return node.get!T;
+			} else static if (isSomeString!T) {
 				enforce!YAMLDException(node.tag != `tag:yaml.org,2002:bool`, "Attempted to read a non-string as a string");
-			return node.get!T;
+				return node.get!string.to!T;
+			} else {
+				return node.get!T;
+			}
 		} else static if (isSomeChar!T) {
+			import std.array : front;
 			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
-			return node.get!(T[])[0];
+			return cast(T)node.get!string.front;
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
 			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
 			return node.get!SysTime.to!T;
