@@ -60,12 +60,15 @@ unittest {
 	File("string.json", "w").write(`"test"`);
 	File("struct.yml", "w").write("---\na: b");
 	scope(exit) { //Clean up when done
-		if ("int.yml".exists)
+		if ("int.yml".exists) {
 			remove("int.yml");
-		if ("string.json".exists)
+		}
+		if ("string.json".exists) {
 			remove("string.json");
-		if ("struct.yml".exists)
+		}
+		if ("struct.yml".exists) {
 			remove("struct.yml");
+		}
 	}
 	//Read examples from respective files
 	assert(fromFile!(uint, YAML)("int.yml") == 9);
@@ -172,18 +175,24 @@ unittest {
 		string a;
 	}
 	scope(exit) { //Clean up when done
-		if ("int.yml".exists)
+		if ("int.yml".exists) {
 			remove("int.yml");
-		if ("string.json".exists)
+		}
+		if ("string.json".exists) {
 			remove("string.json");
-		if ("struct.yml".exists)
+		}
+		if ("struct.yml".exists) {
 			remove("struct.yml");
-		if ("int-auto.yml".exists)
+		}
+		if ("int-auto.yml".exists) {
 			remove("int-auto.yml");
-		if ("string-auto.json".exists)
+		}
+		if ("string-auto.json".exists) {
 			remove("string-auto.json");
-		if ("struct-auto.yml".exists)
+		}
+		if ("struct-auto.yml".exists) {
 			remove("struct-auto.yml");
+		}
 	}
 	//Write the integer "3" to "int.yml"
 	3.toFile!YAML("int.yml");
@@ -232,22 +241,26 @@ version(unittest) {
 			formattedWrite(sink, "%s, ", notNull);
 			formattedWrite(sink, "%s, ", aString);
 			formattedWrite(sink, "%s, ", emptyArray);
-			if (aNullable.isNull)
+			if (aNullable.isNull) {
 				sink("null, ");
-			else
+			} else {
 				formattedWrite(sink, "%s, ", aNullable.get);
-			if (anotherNullable.isNull)
+			}
+			if (anotherNullable.isNull) {
 				sink("null, ");
-			else
+			} else {
 				formattedWrite(sink, "%s, ", anotherNullable.get);
-			if (noDate.isNull)
+			}
+			if (noDate.isNull) {
 				sink("null, ");
-			else
+			} else {
 				formattedWrite(sink, "%s, ", noDate.get);
-			if (noEnum.isNull)
+			}
+			if (noEnum.isNull) {
 				sink("null, ");
-			else
+			} else {
 				formattedWrite(sink, "%s, ", noEnum.get);
+			}
 			sink(")");
 		}
 	}
@@ -321,8 +334,9 @@ version(unittest) {
 		}
 	}
 	void runTest2Fail(T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
-		foreach (siryulizer; siryulizers)
+		foreach (siryulizer; siryulizers) {
 			assertThrown(value.toString!siryulizer.fromString!(T, siryulizer), "Expected "~siryulizer.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
+		}
 	}
 	void runTest(T)(auto ref T expected) {
 		runTest2(expected, expected);
@@ -419,10 +433,10 @@ version(unittest) {
 	//Custom parser
 	struct TimeTest {
 		@CustomParser("fromJunk", "toJunk") SysTime time;
-		static SysTime fromJunk(string) {
+		static SysTime fromJunk(string) @safe {
 			return SysTime(DateTime(2015,10,07,15,04,46),UTC());
 		}
-		static string toJunk(SysTime) {
+		static string toJunk(SysTime) @safe {
 			return "this has nothing to do with time.";
 		}
 	}
@@ -473,8 +487,9 @@ version(unittest) {
 	struct IgnoreErrGood {
 		@IgnoreErrors int n = 5;
 	}
-	foreach (siryulizer; siryulizers)
+	foreach (siryulizer; siryulizers) {
 		assert(IgnoreErrBad().toString!siryulizer.fromString!(IgnoreErrGood, siryulizer).n == IgnoreErrGood.init.n, "IgnoreErrors test failed for "~siryulizer.stringof);
+	}
 
 	struct StructPtr {
 		ubyte[100] bytes;
