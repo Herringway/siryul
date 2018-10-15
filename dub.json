@@ -1,21 +1,11 @@
 {
 	"name": "siryul",
 	"description": "A simple multi-format serialization library.",
-	"copyright": "Copyright © 2016, Cameron",
+	"copyright": "Copyright © 2018, Cameron",
 	"authors": ["Cameron \"Herringway\" Ross"],
 	"license": "BSL-1.0",
 	"homepage": "https://github.com/Herringway/siryul",
-	"configurations": [
-		{
-			"name": "with-yaml",
-			"targetType": "library",
-			"dependencies": {
-				"dyaml": "~>0.7.0"
-			}
-		},
-		{
-			"name": "no-yaml",
-			"targetType": "library"
-		}
-	]
+	"dependencies": {
+		"dyaml": "~>0.7.0"
+	}
 }
