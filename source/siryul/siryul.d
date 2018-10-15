@@ -455,15 +455,19 @@ version(unittest) {
 	import std.typecons : Flag;
 	runTest2(true, Flag!"Yep".yes);
 
-	char[32] testChr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-	runTest2(testChr, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", testChr);
-	dchar[32] testChr2 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-	runTest2(testChr2, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"d);
-	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"d, testChr2);
-	wchar[32] testChr3 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-	runTest2(testChr3, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w);
-	runTest2("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"w, testChr3);
+	import std.utf : toUTF16, toUTF32;
+	enum testStr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+	enum testStrD = testStr.toUTF16;
+	enum testStrW = testStr.toUTF32;
+	char[32] testChr = testStr;
+	runTest2(testChr, testStr);
+	runTest2(testStr, testChr);
+	dchar[32] testChr2 = testStr;
+	runTest2(testChr2, testStrD);
+	runTest2(testStrD, testChr2);
+	wchar[32] testChr3 = testStr;
+	runTest2(testChr3, testStrW);
+	runTest2(testStrW, testChr3);
 
 	//int -> float[] array doesn't even make sense, should be rejected
 	runTest2Fail!(float[])(3);
