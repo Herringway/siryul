@@ -52,9 +52,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 			output = node.fromJSON!(typeof(output.get), flags, path);
 		return output;
 	} else static if (isFloatingPoint!T) {
-		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.STRING);
-		if (node.type == JSON_TYPE.STRING)
+		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
+		if (node.type == JSON_TYPE.STRING) {
 			return node.str.to!T;
+		}
+		if (node.type == JSON_TYPE.INTEGER) {
+			return node.integer.to!T;
+		}
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
 		expect(node, JSON_TYPE.STRING, JSON_TYPE.INTEGER, JSON_TYPE.NULL);
