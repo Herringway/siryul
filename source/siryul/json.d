@@ -105,7 +105,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 						__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
 					}
 				} catch (Exception e) {
-					e.msg = "Error deserializing "~path~":";
+					e.msg = "Error deserializing "~newPath~": "~e.msg;
 					throw e;
 				}
 			}
