@@ -26,8 +26,8 @@ struct YAML {
 		auto buf = appender!string;
 		auto dumper = dumper(buf);
 		auto representer = new Representer;
-		representer.defaultCollectionStyle = CollectionStyle.Block;
-		representer.defaultScalarStyle = ScalarStyle.Plain;
+		representer.defaultCollectionStyle = CollectionStyle.block;
+		representer.defaultScalarStyle = ScalarStyle.plain;
 		dumper.representer = representer;
 		dumper.explicitStart = false;
 		dumper.dump(data.toYAML!(BitFlags!Siryulize(flags), path)());
