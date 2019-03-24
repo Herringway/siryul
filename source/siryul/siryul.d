@@ -365,10 +365,10 @@ version(unittest) {
 	runTest(staticArray);
 
 
-	runTest(TimeOfDay(01, 01, 01));
-	runTest(Date(2000, 01, 01));
-	runTest(DateTime(2000, 01, 01, 01, 01, 01));
-	runTest(SysTime(DateTime(2000, 01, 01), UTC()));
+	runTest(TimeOfDay(1, 1, 1));
+	runTest(Date(2000, 1, 1));
+	runTest(DateTime(2000, 1, 1, 1, 1, 1));
+	runTest(SysTime(DateTime(2000, 1, 1), UTC()));
 
 	runTest2!(SkipImmutable.yes)([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
@@ -392,7 +392,7 @@ version(unittest) {
 	auto nullableTest2 = TestNull(1, "a");
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
-	nullableTest2.noDate = SysTime(DateTime(2000, 01, 01), UTC());
+	nullableTest2.noDate = SysTime(DateTime(2000, 1, 1), UTC());
 	nullableTest2.noEnum = TestEnum.ya;
 	runTest(nullableTest2);
 
@@ -434,7 +434,7 @@ version(unittest) {
 	struct TimeTest {
 		@CustomParser("fromJunk", "toJunk") SysTime time;
 		static SysTime fromJunk(string) @safe {
-			return SysTime(DateTime(2015,10,07,15,04,46),UTC());
+			return SysTime(DateTime(2015,10,7,15,4,46),UTC());
 		}
 		static string toJunk(SysTime) @safe {
 			return "this has nothing to do with time.";
@@ -443,8 +443,8 @@ version(unittest) {
 	struct TimeTestString {
 		string time;
 	}
-	runTest2(TimeTest(SysTime(DateTime(2015,10,07,15,04,46),UTC())), TimeTestString("this has nothing to do with time."));
-	runTest2(TimeTestString("this has nothing to do with time."), TimeTest(SysTime(DateTime(2015,10,07,15,04,46),UTC())));
+	runTest2(TimeTest(SysTime(DateTime(2015,10,7,15,4,46),UTC())), TimeTestString("this has nothing to do with time."));
+	runTest2(TimeTestString("this has nothing to do with time."), TimeTest(SysTime(DateTime(2015,10,7,15,4,46),UTC())));
 
 	union Unhandleable { //Unions are too dangerous to handle automatically
 		int a;
