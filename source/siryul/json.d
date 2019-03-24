@@ -14,7 +14,7 @@ struct JSON {
 	package alias types = AliasSeq!".json";
 	package enum emptyObject = "{}";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
-		return parseJSON(data).fromJSON!(T,BitFlags!DeSiryulize(flags), T.stringof);
+		return fromJSON!(T,BitFlags!DeSiryulize(flags))(parseJSON(data), T.stringof);
 	}
 	package static string asString(Siryulize flags, T)(T data) {
 		const json = data.toJSON!(BitFlags!Siryulize(flags));
@@ -22,7 +22,7 @@ struct JSON {
 	}
 }
 
-private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue node) if (!isInfinite!T) {
+private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = "") if (!isInfinite!T) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
@@ -32,13 +32,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	static if (is(T == struct) && hasDeserializationMethod!T) {
-		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags, path)(node));
+		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags)(node, path));
 	} else static if (is(T == enum)) {
 		import std.conv : to;
 		if (node.type == JSON_TYPE.STRING)
 			return node.str.to!T;
 		else
-			return node.fromJSON!(OriginalType!T, flags, path).to!T;
+			return fromJSON!(OriginalType!T, flags)(node, path).to!T;
 	} else static if (isIntegral!T) {
 		expect(node, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
 		if (node.type == JSON_TYPE.STRING)
@@ -49,7 +49,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		if (node.type == JSON_TYPE.NULL)
 			output.nullify();
 		else
-			output = node.fromJSON!(typeof(output.get), flags, path);
+			output = fromJSON!(typeof(output.get), flags)(node, path);
 		return output;
 	} else static if (isFloatingPoint!T) {
 		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
@@ -73,7 +73,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 			return T.init;
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
-		return T.fromISOExtString(node.fromJSON!(string, flags, path));
+		return T.fromISOExtString(fromJSON!(string, flags)(node, path));
 	} else static if (is(T == struct) || (isPointer!T && is(PointerTarget!T == struct))) {
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
@@ -85,8 +85,8 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		}
 		foreach (member; FieldNameTuple!Undecorated) {
 			static if (__traits(compiles, __traits(getMember, Undecorated, member))) {
-				debug enum newPath = path~"."~member;
-				else enum newPath = "";
+				debug string newPath = path~"."~member;
+				else string newPath = "";
 				alias field = AliasSeq!(__traits(getMember, Undecorated, member));
 				enum memberName = getMemberName!field;
 				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
@@ -99,10 +99,10 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 				try {
 					static if (hasUDA!(field, IgnoreErrors)) {
 						try {
-							__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+							__traits(getMember, output, member) = fromFunc(fromJSON!(Parameters!(fromFunc)[0], flags)(node[memberName], newPath));
 						} catch (UnexpectedTypeException) {} //just skip it
 					} else {
-						__traits(getMember, output, member) = fromFunc(node[memberName].fromJSON!(Parameters!(fromFunc)[0], flags, newPath));
+						__traits(getMember, output, member) = fromFunc(fromJSON!(Parameters!(fromFunc)[0], flags)(node[memberName], newPath));
 					}
 				} catch (Exception e) {
 					e.msg = "Error deserializing "~newPath~": "~e.msg;
@@ -115,12 +115,12 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		import std.algorithm : copy, map;
 		expect(node, JSON_TYPE.ARRAY);
 		T output = new T(node.array.length);
-		copy(node.array.map!(x => fromJSON!(ElementType!T, flags, path)(x)), output);
+		copy(node.array.map!(x => fromJSON!(ElementType!T, flags)(x, path)), output);
 		return output;
 	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
 		expect(node, JSON_TYPE.STRING);
 		T output;
-		foreach (i, chr; node.fromJSON!((ForeachType!T)[], flags, path).byCodeUnit.enumerate(0))
+		foreach (i, chr; fromJSON!((ForeachType!T)[], flags)(node, path).byCodeUnit.enumerate(0))
 			output[i] = chr;
 		return output;
 	} else static if(isStaticArray!T) {
@@ -128,13 +128,13 @@ private T fromJSON(T, BitFlags!DeSiryulize flags, string path = "")(JSONValue no
 		enforce!JSONDException(node.array.length == T.length, "Static array length mismatch");
 		T output;
 		foreach (i, JSONValue newNode; node.array)
-			output[i] = fromJSON!(ForeachType!T, flags, path)(newNode);
+			output[i] = fromJSON!(ForeachType!T, flags)(newNode, path);
 		return output;
 	} else static if(isAssociativeArray!T) {
 		expect(node, JSON_TYPE.OBJECT);
 		T output;
 		foreach (string key, JSONValue value; node.object)
-			output[key] = fromJSON!(ValueType!T, flags, path)(value);
+			output[key] = fromJSON!(ValueType!T, flags)(value, path);
 		return output;
 	} else static if (is(T == bool)) {
 		expect(node, JSON_TYPE.TRUE, JSON_TYPE.FALSE);
