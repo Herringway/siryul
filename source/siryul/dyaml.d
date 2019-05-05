@@ -104,7 +104,7 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 				alias Undecorated = T;
 			}
 			foreach (member; FieldNameTuple!Undecorated) {
-				static if (__traits(compiles, __traits(getMember, Undecorated, member))) {
+				static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
 					alias field = AliasSeq!(__traits(getMember, Undecorated, member));
 					enum memberName = getMemberName!field;
 					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
@@ -204,7 +204,7 @@ private @property Node toYAML(BitFlags!Siryulize flags, T)(T type, string path =
 		static string[] empty;
 		Node output = Node(empty, empty);
 		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(compiles, getMemberName!(__traits(getMember, Undecorated, member)))) {
+			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
 				debug string newPath = path~"."~member;
 				else string newPath = "";
 				static if (!!(flags & Siryulize.omitInits)) {

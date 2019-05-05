@@ -84,7 +84,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = 
 			alias Undecorated = T;
 		}
 		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(compiles, __traits(getMember, Undecorated, member))) {
+			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
 				debug string newPath = path~"."~member;
 				else string newPath = "";
 				alias field = AliasSeq!(__traits(getMember, Undecorated, member));
@@ -197,7 +197,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(compiles, getMemberName!(__traits(getMember, Undecorated, member)))) {
+			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
 				static if (!!(flags & Siryulize.omitInits)) {
 					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
 						if (__traits(getMember, type, member).isNull) {
