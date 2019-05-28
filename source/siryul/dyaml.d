@@ -24,13 +24,11 @@ struct YAML {
 		debug enum path = T.stringof;
 		else enum path = "";
 		auto buf = appender!string;
-		auto dumper = dumper(buf);
-		auto representer = new Representer;
-		representer.defaultCollectionStyle = CollectionStyle.block;
-		representer.defaultScalarStyle = ScalarStyle.plain;
-		dumper.representer = representer;
+		auto dumper = dumper();
+		dumper.defaultCollectionStyle = CollectionStyle.block;
+		dumper.defaultScalarStyle = ScalarStyle.plain;
 		dumper.explicitStart = false;
-		dumper.dump(toYAML!(BitFlags!Siryulize(flags))(data, path));
+		dumper.dump(buf, toYAML!(BitFlags!Siryulize(flags))(data, path));
 		return buf.data;
 	}
 }
@@ -58,21 +56,22 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 	import std.range : enumerate, isOutputRange;
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
-	if (node.isNull)
+	if (node.type == NodeType.null_) {
 		return T.init;
+	}
 	try {
 		static if (is(T == struct) && hasDeserializationMethod!T) {
 			return deserializationMethod!T(fromYAML!(Parameters!(deserializationMethod!T), flags)(node));
 		} else static if (is(T == enum)) {
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			else
 				return node.fromYAML!(OriginalType!T, flags).to!T;
 		} else static if (isNullable!T) {
-			return node.isNull ? T.init : T(node.fromYAML!(TemplateArgsOf!T[0], flags));
+			return node.type == NodeType.null_ ? T.init : T(node.fromYAML!(TemplateArgsOf!T[0], flags));
 		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			if (node.tag == `tag:yaml.org,2002:str`)
 				return node.get!string.to!T;
 			static if (isIntegral!T) {
@@ -86,16 +85,16 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 			}
 		} else static if (isSomeChar!T) {
 			import std.array : front;
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			return cast(T)node.get!string.front;
 		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			return node.get!SysTime.to!T;
 		} else static if (is(T == TimeOfDay)) {
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			return TimeOfDay.fromISOExtString(node.get!string);
 		} else static if (is(T == struct)  || (isPointer!T && is(PointerTarget!T == struct))) {
-			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
 			static if (isPointer!T) {
 				output = new PointerTarget!T;
@@ -124,26 +123,26 @@ private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) 
 			}
 			return output;
 		} else static if(isOutputRange!(T, ElementType!T)) {
-			enforce!YAMLDException(node.isSequence(), "Attempted to read a non-sequence as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
 			T output;
 			foreach (Node newNode; node)
 				output ~= fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
-			enforce!YAMLDException(node.isScalar(), "Attempted to read a non-scalar as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 			T output;
 			foreach (i, chr; node.fromYAML!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
 				output[i] = chr;
 			return output;
 		} else static if(isStaticArray!T) {
-			enforce!YAMLDException(node.isSequence(), "Attempted to read a non-sequence as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
 			T output;
 			size_t i;
 			foreach (Node newNode; node)
 				output[i++] = fromYAML!(ElementType!T, flags)(newNode);
 			return output;
 		} else static if(isAssociativeArray!T) {
-			enforce!YAMLDException(node.isMapping(), "Attempted to read a non-mapping as a "~T.stringof);
+			enforce!YAMLDException(node.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
 			T output;
 			foreach (Node key, Node value; node)
 				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);

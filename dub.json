@@ -6,6 +6,6 @@
 	"license": "BSL-1.0",
 	"homepage": "https://github.com/Herringway/siryul",
 	"dependencies": {
-		"dyaml": "~>0.7.1"
+		"dyaml": "~>0.8.0"
 	}
 }
