@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module siryul.siryul</title>
+		<link rel="stylesheet" type="text/css" href="../styles/ddox.css"/>
+		<link rel="stylesheet" href="../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../scripts/jquery.js">/**/</script><script type="text/javascript" src="../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">siryul
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module selected">
+						<a href="../siryul/siryul.html">siryul</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module siryul.siryul</h1><p></p>
+			<section></section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="fromFile" class="public" href="../siryul/siryul/fromFile.html">fromFile</a><span class="decoration">(path)</span>
+							</code>
+						</td>
+						<td>Deserializes data from a file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="fromString" class="public" href="../siryul/siryul/fromString.html">fromString</a><span class="decoration">(str)</span>
+							</code>
+						</td>
+						<td>Deserializes data from a string.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="toFile" class="public property" href="../siryul/siryul/toFile.html">toFile</a><span class="decoration">(data, path)</span>
+							</code>
+						</td>
+						<td>Serializes data to a file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="toString" class="public property" href="../siryul/siryul/toString.html">toString</a><span class="decoration">(data)</span>
+							</code>
+						</td>
+						<td>Serializes data to a string.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="AutoDetect" class="public" href="../siryul/siryul/AutoDetect.html">AutoDetect</a>
+							</code>
+						</td>
+						<td>Autodetect the serialization format where possible.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ISO8601" class="public" href="../siryul/siryul/ISO8601.html">ISO8601</a>
+							</code>
+						</td>
+						<td>Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ISO8601Extended" class="public" href="../siryul/siryul/ISO8601Extended.html">ISO8601Extended</a>
+							</code>
+						</td>
+						<td>Use extended ISO8601 format for dates and times - YYYY-MM-DDTHH:MM:SS.FFFFFFFTZ
+Generally more readable than standard format.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Manifest constants</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="isSiryulizer" class="public" href="../siryul/siryul/isSiryulizer.html">
+								<code>isSiryulizer</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Gets the value contained within an UDA (only first attribute)
+ Determines whether or not the given type is a valid (de)serializer
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="toFormattedString" class="public" href="../siryul/siryul/toFormattedString.html">
+								<code>toFormattedString</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"></code>
+						</td>
+						<td>For cases where toString is already defined
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

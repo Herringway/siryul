@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Function toFile</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">siryul
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module selected">
+						<a href="../../siryul/siryul.html">siryul</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Function toFile</h1><p>Serializes data to a file.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="typ">void</span> <span class="pln">toFile</span>(Format, <span class="pln">siryul<wbr/></span><span class="pun">.</span><span class="pln">common<wbr/></span><span class="pun">.</span><span class="typ">Siryulize</span> flags<span class="pln"> </span><span class="pun">= </span><span class="typ">Siryulize<wbr/></span><span class="pun">.</span><span class="pln">none</span>, T)
+			<span class="pun">(</span>
+			<br/>
+			&nbsp;&nbsp;<span class="pln">T</span> <span class="pln">data</span><span class="pun">,</span>
+			<br/>
+			&nbsp;&nbsp;<span class="typ">string</span> <span class="pln">path</span>
+			<br/>
+			<span class="pun">)</span><span class="pln"> </span><span class="kwd">@property</span>
+			<br/>
+			<span class="kwd">if</span> <span class="pun">(</span><span class="pln">isSiryulizer</span><span class="pun">!</span><span class="typ">Format </span><span class="pun">|| </span><span class="kwd">is</span><span class="pun">(</span><span class="typ">Format </span><span class="pun">== </span><span class="typ">AutoDetect</span><span class="pun">)</span><span class="pun">);</span>
+					</div>
+				</code>
+			</div>
+			<section><p>Any format supported by this library may be specified. If no format is
+ specified, it will be chosen from the file extension if possible.
+</p>
+
+<p> Supports structs, built-in data types, Nullable, and std.datetime structs.
+</p>
+
+<p> This function will NOT create directories as necessary.
+</p>
+</section>
+
+			<section><h2>Parameters</h2>
+<table><col class="caption"><tr><th>Name</th><th>Description</th></tr>
+<tr><td id="Format">Format</td><td> Serialization format (YAML, JSON, AutoDetect)</td></tr>
+<tr><td id="data">data</td><td> The data to be serialized</td></tr>
+<tr><td id="path">path</td><td> The path for the file to be written</td></tr>
+</table>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">exception </span><span class="pun">: </span><span class="pln">assertThrown</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">file </span><span class="pun">: </span><span class="pln">exists</span><span class="pun">, </span><span class="pln">remove</span><span class="pun">;
+</span><span class="kwd">struct </span><span class="typ">TestStruct </span><span class="pun">{
+	</span><span class="typ">string </span><span class="pln">a</span><span class="pun">;
+}
+</span><span class="kwd">scope</span><span class="pun">(</span><span class="pln">exit</span><span class="pun">) { </span><span class="com">//Clean up when done
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"int.yml"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"int.yml"</span><span class="pun">);
+	}
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"string.json"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"string.json"</span><span class="pun">);
+	}
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"struct.yml"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"struct.yml"</span><span class="pun">);
+	}
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"int-auto.yml"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"int-auto.yml"</span><span class="pun">);
+	}
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"string-auto.json"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"string-auto.json"</span><span class="pun">);
+	}
+	</span><span class="kwd">if </span><span class="pun">(</span><span class="str">"struct-auto.yml"<wbr/></span><span class="pun">.</span><span class="pln">exists</span><span class="pun">) {
+		</span><span class="pln">remove</span><span class="pun">(</span><span class="str">"struct-auto.yml"</span><span class="pun">);
+	}
+}
+</span><span class="com">//Write the integer "3" to "int.yml"
+</span><span class="lit">3<wbr/></span><span class="pun">.</span><span class="pln">toFile</span><span class="pun">!</span><span class="pln">YAML</span><span class="pun">(</span><span class="str">"int.yml"</span><span class="pun">);
+</span><span class="com">//Write the string "str" to "string.json"
+</span><span class="str">"str"<wbr/></span><span class="pun">.</span><span class="pln">toFile</span><span class="pun">!</span><span class="pln">JSON</span><span class="pun">(</span><span class="str">"string.json"</span><span class="pun">);
+</span><span class="com">//Write a structure to "struct.yml"
+</span><span class="typ">TestStruct</span><span class="pun">(</span><span class="str">"b"</span><span class="pun">)<wbr/>.</span><span class="pln">toFile</span><span class="pun">!</span><span class="pln">YAML</span><span class="pun">(</span><span class="str">"struct.yml"</span><span class="pun">);
+
+</span><span class="com">//Check that contents are correct
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"int.yml"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">uint </span><span class="pun">== </span><span class="lit">3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"string.json"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">string </span><span class="pun">== </span><span class="str">"str"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"struct.yml"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">TestStruct </span><span class="pun">== </span><span class="typ">TestStruct</span><span class="pun">(</span><span class="str">"b"</span><span class="pun">));
+
+</span><span class="com">//Write the integer "3" to "int-auto.yml", but detect format automatically
+</span><span class="lit">3<wbr/></span><span class="pun">.</span><span class="pln">toFile</span><span class="pun">(</span><span class="str">"int-auto.yml"</span><span class="pun">);
+</span><span class="com">//Write the string "str" to "string-auto.json", but detect format automatically
+</span><span class="str">"str"<wbr/></span><span class="pun">.</span><span class="pln">toFile</span><span class="pun">(</span><span class="str">"string-auto.json"</span><span class="pun">);
+</span><span class="com">//Write a structure to "struct-auto.yml", but detect format automatically
+</span><span class="typ">TestStruct</span><span class="pun">(</span><span class="str">"b"</span><span class="pun">)<wbr/>.</span><span class="pln">toFile</span><span class="pun">(</span><span class="str">"struct-auto.yml"</span><span class="pun">);
+
+</span><span class="com">//Check that contents are correct
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"int-auto.yml"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">uint </span><span class="pun">== </span><span class="lit">3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"string-auto.json"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">string </span><span class="pun">== </span><span class="str">"str"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"struct-auto.yml"<a href="../../siryul/siryul/fromFile.html"></span><wbr/><span class="pun">.</span><span class="pln">fromFile</span></a><span class="pun">!</span><span class="typ">TestStruct </span><span class="pun">== </span><span class="typ">TestStruct</span><span class="pun">(</span><span class="str">"b"</span><span class="pun">));
+
+</span><span class="com">//Bad extension for auto-detection mechanism
+</span><span class="pln">assertThrown</span><span class="pun">(</span><span class="lit">3<wbr/></span><span class="pun">.</span><span class="pln">toFile</span><span class="pun">(</span><span class="str">"file.obviouslybadextension"</span><span class="pun">));
+</span></code></pre>
+</section>
+
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

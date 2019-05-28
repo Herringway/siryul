@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>http://127.0.0.1/index.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/AutoDetect.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/fromFile.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/fromString.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/ISO8601.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/ISO8601Extended.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/isSiryulizer.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/isSiryulizer.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/toFile.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/toFormattedString.html</loc></url>
+<url><loc>http://127.0.0.1/siryul/siryul/toString.html</loc></url>
+</urlset>

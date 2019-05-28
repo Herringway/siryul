@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Function toString</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">siryul
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module selected">
+						<a href="../../siryul/siryul.html">siryul</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Function toString</h1><p>Serializes data to a string.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">auto </span><span class="kwd">auto</span> <span class="pln">toString</span>(Format, <span class="pln">siryul<wbr/></span><span class="pun">.</span><span class="pln">common<wbr/></span><span class="pun">.</span><span class="typ">Siryulize</span> flags<span class="pln"> </span><span class="pun">= </span><span class="typ">Siryulize<wbr/></span><span class="pun">.</span><span class="pln">none</span>, T)
+			<span class="pun">(</span>
+			<br/>
+			&nbsp;&nbsp;<span class="pln">T</span> <span class="pln">data</span>
+			<br/>
+			<span class="pun">)</span><span class="pln"> </span><span class="kwd">@property</span>
+			<br/>
+			<span class="kwd">if</span> <span class="pun">(</span><span class="pln">isSiryulizer</span><span class="pun">!</span><span class="typ">Format</span><span class="pun">);</span>
+					</div>
+				</code>
+			</div>
+			<section><p>UTF-8 encoded by default.
+</p>
+
+<p> Supports structs, built-in data types, Nullable, and std.datetime structs.
+</p>
+</section>
+
+			<section><h2>Parameters</h2>
+<table><col class="caption"><tr><th>Name</th><th>Description</th></tr>
+<tr><td id="Format">Format</td><td> Serialization format (YAML, JSON, AutoDetect)</td></tr>
+<tr><td id="data">data</td><td> The data to be serialized</td></tr>
+</table>
+</section>
+<section><h2>Returns</h2>
+<p>A string in the specified format representing the user's data, UTF-8 encoded
+</p>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="com">//3 as a JSON object
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="lit">3<wbr/></span><span class="pun">.</span><span class="pln">toString</span><span class="pun">!</span><span class="pln">JSON </span><span class="pun">== </span><span class="str">`3`</span><span class="pun">);
+</span><span class="com">//"str" as a JSON object
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="str">"str"<wbr/></span><span class="pun">.</span><span class="pln">toString</span><span class="pun">!</span><span class="pln">JSON </span><span class="pun">== </span><span class="str">`"str"`</span><span class="pun">);
+</span></code></pre>
+</section>
+
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>
