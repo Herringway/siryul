@@ -1,6 +1,6 @@
 module siryul.json;
 private import siryul.common;
-private import std.json : JSONValue, JSON_TYPE, parseJSON, toJSON;
+private import std.json : JSONValue, JSONType, parseJSON, toJSON;
 private import std.range.primitives : ElementType, isInfinite, isInputRange;
 private import std.traits : isSomeChar;
 private import std.typecons;
@@ -35,47 +35,47 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = 
 		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags)(node, path));
 	} else static if (is(T == enum)) {
 		import std.conv : to;
-		if (node.type == JSON_TYPE.STRING)
+		if (node.type == JSONType.string)
 			return node.str.to!T;
 		else
 			return fromJSON!(OriginalType!T, flags)(node, path).to!T;
 	} else static if (isIntegral!T) {
-		expect(node, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
-		if (node.type == JSON_TYPE.STRING)
+		expect(node, JSONType.integer, JSONType.string);
+		if (node.type == JSONType.string)
 			return node.str.to!T;
 		return node.integer.to!T;
 	} else static if (isNullable!T) {
 		T output;
-		if (node.type == JSON_TYPE.NULL)
+		if (node.type == JSONType.null_)
 			output.nullify();
 		else
 			output = fromJSON!(typeof(output.get), flags)(node, path);
 		return output;
 	} else static if (isFloatingPoint!T) {
-		expect(node, JSON_TYPE.FLOAT, JSON_TYPE.INTEGER, JSON_TYPE.STRING);
-		if (node.type == JSON_TYPE.STRING) {
+		expect(node, JSONType.float_, JSONType.integer, JSONType.string);
+		if (node.type == JSONType.string) {
 			return node.str.to!T;
 		}
-		if (node.type == JSON_TYPE.INTEGER) {
+		if (node.type == JSONType.integer) {
 			return node.integer.to!T;
 		}
 		return node.floating.to!T;
 	} else static if (isSomeString!T) {
-		expect(node, JSON_TYPE.STRING, JSON_TYPE.INTEGER, JSON_TYPE.NULL);
-		if (node.type == JSON_TYPE.INTEGER)
+		expect(node, JSONType.string, JSONType.integer, JSONType.null_);
+		if (node.type == JSONType.integer)
 			return node.integer.to!T;
-		if (node.type == JSON_TYPE.NULL)
+		if (node.type == JSONType.null_)
 			return T.init;
 		return node.str.to!T;
 	} else static if (isSomeChar!T) {
-		expect(node, JSON_TYPE.STRING, JSON_TYPE.NULL);
-		if (node.type == JSON_TYPE.NULL)
+		expect(node, JSONType.string, JSONType.null_);
+		if (node.type == JSONType.null_)
 			return T.init;
 		return node.str.front.to!T;
 	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
 		return T.fromISOExtString(fromJSON!(string, flags)(node, path));
 	} else static if (is(T == struct) || (isPointer!T && is(PointerTarget!T == struct))) {
-		expect(node, JSON_TYPE.OBJECT);
+		expect(node, JSONType.object);
 		T output;
 		static if (isPointer!T) {
 			output = new PointerTarget!T;
@@ -90,7 +90,7 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = 
 				alias field = AliasSeq!(__traits(getMember, Undecorated, member));
 				enum memberName = getMemberName!field;
 				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
-					if ((memberName !in node.object) || (node.object[memberName].type == JSON_TYPE.NULL))
+					if ((memberName !in node.object) || (node.object[memberName].type == JSONType.null_))
 						continue;
 				} else {
 					enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
@@ -113,34 +113,34 @@ private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = 
 		return output;
 	} else static if(isOutputRange!(T, ElementType!T)) {
 		import std.algorithm : copy, map;
-		expect(node, JSON_TYPE.ARRAY);
+		expect(node, JSONType.array);
 		T output = new T(node.array.length);
 		copy(node.array.map!(x => fromJSON!(ElementType!T, flags)(x, path)), output);
 		return output;
 	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
-		expect(node, JSON_TYPE.STRING);
+		expect(node, JSONType.string);
 		T output;
 		foreach (i, chr; fromJSON!((ForeachType!T)[], flags)(node, path).byCodeUnit.enumerate(0))
 			output[i] = chr;
 		return output;
 	} else static if(isStaticArray!T) {
-		expect(node, JSON_TYPE.ARRAY);
+		expect(node, JSONType.array);
 		enforce!JSONDException(node.array.length == T.length, "Static array length mismatch");
 		T output;
 		foreach (i, JSONValue newNode; node.array)
 			output[i] = fromJSON!(ForeachType!T, flags)(newNode, path);
 		return output;
 	} else static if(isAssociativeArray!T) {
-		expect(node, JSON_TYPE.OBJECT);
+		expect(node, JSONType.object);
 		T output;
 		foreach (string key, JSONValue value; node.object)
 			output[key] = fromJSON!(ValueType!T, flags)(value, path);
 		return output;
 	} else static if (is(T == bool)) {
-		expect(node, JSON_TYPE.TRUE, JSON_TYPE.FALSE);
-		if (node.type == JSON_TYPE.TRUE)
+		expect(node, JSONType.true_, JSONType.false_);
+		if (node.type == JSONType.true_)
 			return true;
-		else if (node.type == JSON_TYPE.FALSE)
+		else if (node.type == JSONType.false_)
 			return false;
 		assert(false);
 	} else
@@ -185,7 +185,7 @@ private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isI
 		string[string] arr;
 		output = JSONValue(arr);
 		foreach (key, value; type) {
-			output.object[key.text] = value.toJSON!flags;
+			output.object[key] = value.toJSON!flags;
 		}
 	} else static if (isSimpleList!Undecorated) {
 		string[] arr;
@@ -238,7 +238,7 @@ class JSONDException : DeserializeException {
 + Thrown when a JSON value has an unexpected type.
 +/
 class UnexpectedTypeException : JSONDException {
-	package this(JSON_TYPE expectedType, JSON_TYPE unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	package this(JSONType expectedType, JSONType unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
 		import std.exception : assumeWontThrow, ifThrown;
 		super("Expecting JSON type "~assumeWontThrow(expectedType.text.ifThrown("Unknown"))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
