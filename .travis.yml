@@ -15,7 +15,8 @@ install:
   - chmod +x doveralls
 script:
   - dub test -b unittest-cov
-  - ./doveralls
+  - dub fetch doveralls
+  - dub run doveralls
 before_deploy:
   - dub build -b ddox
 deploy:
