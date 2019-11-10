@@ -11,24 +11,28 @@ import std.typecons;
 struct YAML {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!(".yml", ".yaml");
-	package enum emptyObject = "---\n...";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.utf : byChar;
 		auto str = data.byChar.to!(char[]);
 		auto loader = Loader.fromString(str).load();
-		return loader.fromYAML!(T, BitFlags!DeSiryulize(flags));
+		try {
+			T result;
+			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader, "", result);
+			return result;
+		} catch (NodeException e) {
+			debug(norethrow) throw e;
+			else throw new YAMLDException(e.msg);
+		}
 	}
 	package static string asString(Siryulize flags, T)(T data) {
 		import std.array : appender;
-		debug enum path = T.stringof;
-		else enum path = "";
 		auto buf = appender!string;
 		auto dumper = dumper();
 		dumper.defaultCollectionStyle = CollectionStyle.block;
 		dumper.defaultScalarStyle = ScalarStyle.plain;
 		dumper.explicitStart = false;
-		dumper.dump(buf, toYAML!(BitFlags!Siryulize(flags))(data, path));
+		dumper.dump(buf, serialize!(YAML, BitFlags!Siryulize(flags))(data));
 		return buf.data;
 	}
 }
@@ -48,196 +52,276 @@ class YAMLSException : SerializeException {
 		super(msg, file, line);
 	}
 }
-private T fromYAML(T, BitFlags!DeSiryulize flags)(Node node) if (!isInfinite!T) {
+template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	import std.conv : to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
-	import std.meta : AliasSeq;
-	import std.range : enumerate, isOutputRange;
+	import std.range : enumerate, isOutputRange, put;
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
-	if (node.type == NodeType.null_) {
-		return T.init;
+	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
+		import std.conv : to;
+		import std.traits : OriginalType;
+		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		if (value.tag == `tag:yaml.org,2002:str`) {
+			result = value.get!string.to!T;
+		} else {
+			OriginalType!T tmp;
+			deserialize(value, path, tmp);
+			result = tmp.to!T;
+		}
 	}
-	try {
-		static if (is(T == struct) && hasDeserializationMethod!T) {
-			return deserializationMethod!T(fromYAML!(Parameters!(deserializationMethod!T), flags)(node));
-		} else static if (is(T == enum)) {
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			if (node.tag == `tag:yaml.org,2002:str`)
-				return node.get!string.to!T;
-			else
-				return node.fromYAML!(OriginalType!T, flags).to!T;
-		} else static if (isNullable!T) {
-			return node.type == NodeType.null_ ? T.init : T(node.fromYAML!(TemplateArgsOf!T[0], flags));
-		} else static if (isIntegral!T || isSomeString!T || isFloatingPoint!T) {
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			if (node.tag == `tag:yaml.org,2002:str`)
-				return node.get!string.to!T;
-			static if (isIntegral!T) {
-				enforce!YAMLDException(node.tag == `tag:yaml.org,2002:int`, "Attempted to read a float as an integer");
-				return node.get!T;
-			} else static if (isSomeString!T) {
-				enforce!YAMLDException(node.tag != `tag:yaml.org,2002:bool`, "Attempted to read a non-string as a string");
-				return node.get!string.to!T;
-			} else {
-				return node.get!T;
+	void deserialize(T)(Node value, string path, out T result) if (is(T == TimeOfDay)) {
+		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		result = TimeOfDay.fromISOExtString(value.get!string);
+	}
+	void deserialize(T)(Node value, string path, out T result) if (isNullable!T) {
+		if (value.type == NodeType.null_) {
+			result.nullify();
+		} else {
+			typeof(result.get) tmp;
+			deserialize(value, path, tmp);
+			result = tmp;
+		}
+	}
+	void deserialize(Node value, string path, out bool result) {
+		enforce!YAMLDException(value.tag == `tag:yaml.org,2002:bool`, "Expecting a boolean value");
+		result = value.get!bool;
+	}
+	void deserialize(V, K)(Node value, string path, out V[K] result) {
+		enforce!YAMLDException(value.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~(V[K]).stringof);
+		foreach (Node k, Node v; value) {
+			K key;
+			V val;
+			deserialize(k, path, key);
+			deserialize(v, path, val);
+			result[key] = val;
+		}
+	}
+	void deserialize(T, size_t N)(Node value, string path, out T[N] result) {
+		static if (isSomeChar!T) {
+			enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~(T[N]).stringof);
+			ForeachType!(T[N])[] str;
+			deserialize(value, path, str);
+			foreach (i, chr; str.byCodeUnit.enumerate(0)) {
+				enforce!YAMLDException(i < N, "Static array too small to contain all elements");
+				result[i] = chr;
 			}
-		} else static if (isSomeChar!T) {
-			import std.array : front;
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			return cast(T)node.get!string.front;
-		} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			return node.get!SysTime.to!T;
-		} else static if (is(T == TimeOfDay)) {
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			return TimeOfDay.fromISOExtString(node.get!string);
-		} else static if (is(T == struct)  || (isPointer!T && is(PointerTarget!T == struct))) {
-			enforce!YAMLDException(node.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
-			T output;
-			static if (isPointer!T) {
-				output = new PointerTarget!T;
-				alias Undecorated = PointerTarget!T;
-			} else {
-				alias Undecorated = T;
+			return;
+		} else {
+			enforce!YAMLDException(value.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~(T[N]).stringof);
+			size_t i;
+			foreach (Node newNode; value) {
+				enforce!YAMLDException(i < N, "Static array too small to contain all elements");
+				deserialize(newNode, path, result[i++]);
 			}
-			foreach (member; FieldNameTuple!Undecorated) {
-				static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
-					alias field = AliasSeq!(__traits(getMember, Undecorated, member));
+			return;
+		}
+	}
+	void deserialize(T)(Node value, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
+		if (value.type != NodeType.null_) {
+			enforce!YAMLDException(value.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
+			foreach (Node newNode; value) {
+				ElementType!T ele;
+				deserialize(newNode, path, ele);
+				result ~= ele;
+			}
+		}
+	}
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
+		static if (hasDeserializationMethod!T) {
+			Parameters!(deserializationMethod!T) tmp;
+			deserialize(value, path, tmp);
+			result = deserializationMethod!T(tmp);
+			return;
+		} else {
+			import std.exception : enforce;
+			import std.meta : AliasSeq;
+			import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+			enforce!YAMLDException(value.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
+			foreach (member; FieldNameTuple!T) {
+				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+					debug string newPath = path~"."~member;
+					else string newPath = path;
+					alias field = AliasSeq!(__traits(getMember, T, member));
 					enum memberName = getMemberName!field;
 					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
-						if (!node.containsKey(memberName))
+						if (memberName !in value) {
 							continue;
+						}
 					} else {
-						enforce!YAMLDException(node.containsKey(memberName), "Missing non-@Optional "~memberName~" in node");
+						enforce!YAMLDException(memberName in value, "Missing non-@Optional "~memberName~" in node");
 					}
-					alias fromFunc = getConvertFromFunc!(T, __traits(getMember, Undecorated, member));
-					static if (hasUDA!(__traits(getMember, Undecorated, member), IgnoreErrors)) {
-						try {
-							__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
-						} catch (YAMLDException) {}
-					} else
-						__traits(getMember, output, member) = fromFunc(node[memberName].fromYAML!(Parameters!(fromFunc)[0], flags));
+					alias fromFunc = getConvertFromFunc!(T, field);
+					try {
+						Parameters!(fromFunc)[0] param;
+						static if (hasUDA!(field, IgnoreErrors)) {
+							try {
+								deserialize(value[memberName], newPath, param);
+								__traits(getMember, result, member) = fromFunc(param);
+							} catch (YAMLDException) {} //just skip it
+						} else {
+							deserialize(value[memberName], newPath, param);
+							__traits(getMember, result, member) = fromFunc(param);
+						}
+					} catch (Exception e) {
+						e.msg = "Error deserializing "~newPath~": "~e.msg;
+						throw e;
+					}
 				}
 			}
-			return output;
-		} else static if(isOutputRange!(T, ElementType!T)) {
-			enforce!YAMLDException(node.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
-			T output;
-			foreach (Node newNode; node)
-				output ~= fromYAML!(ElementType!T, flags)(newNode);
-			return output;
-		} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
-			enforce!YAMLDException(node.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
-			T output;
-			foreach (i, chr; node.fromYAML!((ForeachType!T)[], flags).byCodeUnit.enumerate(0))
-				output[i] = chr;
-			return output;
-		} else static if(isStaticArray!T) {
-			enforce!YAMLDException(node.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
-			T output;
-			size_t i;
-			foreach (Node newNode; node)
-				output[i++] = fromYAML!(ElementType!T, flags)(newNode);
-			return output;
-		} else static if(isAssociativeArray!T) {
-			enforce!YAMLDException(node.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
-			T output;
-			foreach (Node key, Node value; node)
-				output[fromYAML!(KeyType!T, flags)(key)] = fromYAML!(ValueType!T, flags)(value);
-			return output;
-		} else static if (is(T == bool)) {
-			enforce!YAMLDException(node.tag == `tag:yaml.org,2002:bool`, "Expecting a boolean value");
-			return node.get!T;
-		} else
-			static assert(false, "Cannot read type "~T.stringof~" from YAML"); //unreachable, hopefully.
-	} catch (NodeException e) {
-		throw new YAMLDException(e.msg);
+		}
 	}
+	void deserialize(T)(Node value, string path, out T result) if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
+		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		result = value.get!SysTime.to!T;
+	}
+	void deserialize(T)(Node value, string path, out T result) if (isSomeChar!T) {
+		import std.array : front;
+		if (value.type != NodeType.null_) {
+			enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+			result = cast(T)value.get!string.front;
+		}
+	}
+	void deserialize(T)(Node value, string path, out T result) if (isSomeString!T && !canStoreUnchanged!T && !is(T == enum)) {
+		string str;
+		deserialize(value, path, str);
+		result = str.to!T;
+	}
+	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T && !is(T == enum)) {
+		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		if (value.tag == `tag:yaml.org,2002:str`) {
+			result = value.get!string.to!T;
+		} else {
+			static if (isIntegral!T) {
+				enforce!YAMLDException(value.tag == `tag:yaml.org,2002:int`, "Attempted to read a float as an integer");
+				result = value.get!T;
+			} else static if (isSomeString!T) {
+				enforce!YAMLDException(value.tag != `tag:yaml.org,2002:bool`, "Attempted to read a non-string as a string");
+				if (value.type != NodeType.null_) {
+					result = value.get!T;
+				}
+			} else {
+				result = value.get!T;
+			}
+		}
+	}
+	void deserialize(T : P*, P)(Node value, string path, out T result) {
+		result = new P;
+		deserialize(value, path, *result);
+	}
+	void deserialize(Node, string, out typeof(null)) {}
 }
-private @property Node toYAML(BitFlags!Siryulize flags, T)(T type, string path = "") if (!isInfinite!T) {
+template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.meta : AliasSeq;
 	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
-	static if (isPointer!T) {
-		alias Undecorated = Unqual!(PointerTarget!T);
-	} else {
-		alias Undecorated = Unqual!T;
+	private auto serialize(const typeof(null) value) {
+		return Node(YAMLNull());
 	}
-	static if (is(T == struct) && hasSerializationMethod!T) {
-		return toYAML!flags(mixin("type."~__traits(identifier, serializationMethod!T)), path);
-	} else static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
-		return Node(type.text);
-	} else static if (isNullable!Undecorated) {
-		if (type.isNull) {
-			return Node(YAMLNull());
-		} else {
-			return toYAML!flags(type.get(), path);
-		}
-	} else static if (is(Undecorated == SysTime)) {
-		return Node(type.to!Undecorated, "tag:yaml.org,2002:timestamp");
-	} else static if (is(Undecorated == DateTime) || is(Undecorated == Date)) {
-		return Node(type.toISOExtString(), "tag:yaml.org,2002:timestamp");
-	} else static if (is(Undecorated == TimeOfDay)) {
-		return Node(type.toISOExtString());
-	} else static if (isSomeChar!Undecorated) {
-		return toYAML!flags([type], path);
-	} else static if (canStoreUnchanged!Undecorated) {
-		return Node(type.to!Undecorated);
-	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
+	private auto serialize(const SysTime value) {
+		return Node(value.to!SysTime, "tag:yaml.org,2002:timestamp");
+	}
+	private auto serialize(const TimeOfDay value) {
+		return Node(value.toISOExtString);
+	}
+	private auto serialize(T)(const T value) if (isSomeChar!T) {
+		return serialize([value]);
+	}
+	private auto serialize(T)(const T value) if (canStoreUnchanged!T && !is(T == enum)) {
+		return Node(value.to!T);
+	}
+	private auto serialize(T)(const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
 		import std.utf : toUTF8;
-		return toYAML!flags(type[].toUTF8().idup, path);
-	} else static if(isAssociativeArray!Undecorated) {
+		return serialize(value[].toUTF8().idup);
+	}
+	private auto serialize(T)(const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+		return Node(value.text);
+	}
+	private auto serialize(T)(const T value) if (isAssociativeArray!T) {
 		Node[Node] output;
-		foreach (key, value; type)
-			output[toYAML!flags(key, path)] = toYAML!flags(value, path);
+		foreach (k, v; value) {
+			output[serialize(k)] = serialize(v);
+		}
 		return Node(output);
-	} else static if(isSimpleList!Undecorated) {
+	}
+	private auto serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T)) {
 		Node[] output;
-		foreach (value; type)
-			output ~= toYAML!flags(value, path);
+		foreach (value; values) {
+			output ~= serialize(value);
+		}
 		return Node(output);
-	} else static if (is(Undecorated == struct)) {
-		static string[] empty;
-		Node output = Node(empty, empty);
-		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
-				debug string newPath = path~"."~member;
-				else string newPath = "";
-				static if (!!(flags & Siryulize.omitInits)) {
-					static if (isNullable!(typeof(__traits(getMember, type, member)))) {
-						if (__traits(getMember, type, member).isNull)
-							continue;
-					} else {
-						if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
-							continue;
+	}
+	private auto serialize(T)(auto ref const T value) if (isPointer!T) {
+		return serialize(*value);
+	}
+	private auto serialize(T)(const T value) if (is(T == struct)) {
+		static if (hasSerializationMethod!T) {
+			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
+		} else static if (is(T == Date) || is(T == DateTime)) {
+			return Node(value.toISOExtString, "tag:yaml.org,2002:timestamp");
+		} else static if (isNullable!T) {
+			if (value.isNull) {
+				return serialize(null);
+			} else {
+				return serialize(value.get);
+			}
+		} else {
+			static string[] empty;
+			Node output = Node(empty, empty);
+			foreach (member; FieldNameTuple!T) {
+				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+					static if (!!(flags & Siryulize.omitInits)) {
+						static if (isNullable!(typeof(__traits(getMember, value, member)))) {
+							if (__traits(getMember, value, member).isNull)
+								continue;
+						} else {
+							if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
+								continue;
+							}
 						}
 					}
-				}
-				enum memberName = getMemberName!(__traits(getMember, Undecorated, member));
-				try {
-					static if (isPointer!(typeof(mixin("type."~member))) && !!(flags & Siryulize.omitNulls)) {
-						if (mixin("type."~member) is null) {
-							continue;
+					enum memberName = getMemberName!(__traits(getMember, T, member));
+					try {
+						static if (isPointer!(typeof(mixin("value."~member))) && !!(flags & Siryulize.omitNulls)) {
+							if (mixin("value."~member) is null) {
+								continue;
+							}
 						}
+						static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
+							auto val = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
+							output.add(memberName, val);
+						} else {
+							output.add(memberName, serialize(mixin("value."~member)));
+						}
+					} catch (Exception e) {
+						e.msg = "Error serializing: "~e.msg;
+						throw e;
 					}
-					static if (hasConvertToFunc!(T, __traits(getMember, Undecorated, member))) {
-						auto val = toYAML!flags(getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)), newPath);
-						output.add(memberName, val);
-					} else {
-						output.add(memberName, toYAML!(flags)(mixin("type."~member), newPath));
-					}
-				} catch (Exception e) {
-					e.msg = "Error serializing "~newPath~": "~e.msg;
-					throw e;
 				}
 			}
+			return output;
 		}
-		return output;
-	} else
-		static assert(false, "Cannot write type "~T.stringof~" to YAML"); //unreachable, hopefully
+	}
+}
+private template expectedTag(T) {
+	import std.datetime.systime : SysTime;
+	import std.traits : isFloatingPoint, isIntegral;
+	static if(isIntegral!T) {
+		enum expectedTag = `tag:yaml.org,2002:int`;
+	}
+	static if(is(T == bool)) {
+		enum expectedTag = `tag:yaml.org,2002:bool`;
+	}
+	static if(isFloatingPoint!T) {
+		enum expectedTag = `tag:yaml.org,2002:float`;
+	}
+	static if(is(T == string)) {
+		enum expectedTag = `tag:yaml.org,2002:str`;
+	}
+	static if(is(T == SysTime)) {
+		enum expectedTag = `tag:yaml.org,2002:timestamp`;
+	}
 }
 private template canStoreUnchanged(T) {
 	import std.traits : isFloatingPoint, isIntegral;

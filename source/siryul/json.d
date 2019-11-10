@@ -1,8 +1,8 @@
 module siryul.json;
 private import siryul.common;
 private import std.json : JSONValue, JSONType, parseJSON, toJSON;
-private import std.range.primitives : ElementType, isInfinite, isInputRange;
-private import std.traits : isSomeChar;
+private import std.range.primitives : ElementType, isInfinite, isInputRange, isOutputRange;
+private import std.traits : isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray;
 private import std.typecons;
 /++
  + JSON (JavaScript Object Notation) serialization format
@@ -12,215 +12,268 @@ private import std.typecons;
 struct JSON {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!".json";
-	package enum emptyObject = "{}";
 	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
-		return fromJSON!(T,BitFlags!DeSiryulize(flags))(parseJSON(data), T.stringof);
+		T output;
+		deserialize!(JSON, BitFlags!DeSiryulize(flags))(parseJSON(data), T.stringof, output);
+		return output;
 	}
 	package static string asString(Siryulize flags, T)(T data) {
-		const json = data.toJSON!(BitFlags!Siryulize(flags));
+		const json = serialize!(JSON, BitFlags!Siryulize(flags))(data);
 		return toJSON(json, true);
 	}
 }
 
-private T fromJSON(T, BitFlags!DeSiryulize flags)(JSONValue node, string path = "") if (!isInfinite!T) {
-	import std.conv : text, to;
-	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.exception : enforce;
-	import std.meta : AliasSeq;
-	import std.range.primitives : front;
-	import std.range : enumerate, isOutputRange;
-	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-	import std.utf : byCodeUnit;
-	static if (is(T == struct) && hasDeserializationMethod!T) {
-		return deserializationMethod!T(fromJSON!(Parameters!(deserializationMethod!T), flags)(node, path));
-	} else static if (is(T == enum)) {
-		import std.conv : to;
-		if (node.type == JSONType.string)
-			return node.str.to!T;
-		else
-			return fromJSON!(OriginalType!T, flags)(node, path).to!T;
-	} else static if (isIntegral!T) {
-		expect(node, JSONType.integer, JSONType.string);
-		if (node.type == JSONType.string)
-			return node.str.to!T;
-		return node.integer.to!T;
-	} else static if (isNullable!T) {
-		T output;
-		if (node.type == JSONType.null_)
-			output.nullify();
-		else
-			output = fromJSON!(typeof(output.get), flags)(node, path);
-		return output;
-	} else static if (isFloatingPoint!T) {
-		expect(node, JSONType.float_, JSONType.integer, JSONType.string);
-		if (node.type == JSONType.string) {
-			return node.str.to!T;
-		}
-		if (node.type == JSONType.integer) {
-			return node.integer.to!T;
-		}
-		return node.floating.to!T;
-	} else static if (isSomeString!T) {
-		expect(node, JSONType.string, JSONType.integer, JSONType.null_);
-		if (node.type == JSONType.integer)
-			return node.integer.to!T;
-		if (node.type == JSONType.null_)
-			return T.init;
-		return node.str.to!T;
-	} else static if (isSomeChar!T) {
-		expect(node, JSONType.string, JSONType.null_);
-		if (node.type == JSONType.null_)
-			return T.init;
-		return node.str.front.to!T;
-	} else static if (is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay)) {
-		return T.fromISOExtString(fromJSON!(string, flags)(node, path));
-	} else static if (is(T == struct) || (isPointer!T && is(PointerTarget!T == struct))) {
-		expect(node, JSONType.object);
-		T output;
-		static if (isPointer!T) {
-			output = new PointerTarget!T;
-			alias Undecorated = PointerTarget!T;
-		} else {
-			alias Undecorated = T;
-		}
-		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
-				debug string newPath = path~"."~member;
-				else string newPath = "";
-				alias field = AliasSeq!(__traits(getMember, Undecorated, member));
-				enum memberName = getMemberName!field;
-				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
-					if ((memberName !in node.object) || (node.object[memberName].type == JSONType.null_))
-						continue;
-				} else {
-					enforce!JSONDException(memberName in node.object, "Missing non-@Optional "~memberName~" in node");
-				}
-				alias fromFunc = getConvertFromFunc!(T, field);
-				try {
-					static if (hasUDA!(field, IgnoreErrors)) {
-						try {
-							__traits(getMember, output, member) = fromFunc(fromJSON!(Parameters!(fromFunc)[0], flags)(node[memberName], newPath));
-						} catch (UnexpectedTypeException) {} //just skip it
-					} else {
-						__traits(getMember, output, member) = fromFunc(fromJSON!(Parameters!(fromFunc)[0], flags)(node[memberName], newPath));
-					}
-				} catch (Exception e) {
-					e.msg = "Error deserializing "~newPath~": "~e.msg;
-					throw e;
-				}
-			}
-		}
-		return output;
-	} else static if(isOutputRange!(T, ElementType!T)) {
-		import std.algorithm : copy, map;
-		expect(node, JSONType.array);
-		T output = new T(node.array.length);
-		copy(node.array.map!(x => fromJSON!(ElementType!T, flags)(x, path)), output);
-		return output;
-	} else static if (isStaticArray!T && isSomeChar!(ElementType!T)) {
-		expect(node, JSONType.string);
-		T output;
-		foreach (i, chr; fromJSON!((ForeachType!T)[], flags)(node, path).byCodeUnit.enumerate(0))
-			output[i] = chr;
-		return output;
-	} else static if(isStaticArray!T) {
-		expect(node, JSONType.array);
-		enforce!JSONDException(node.array.length == T.length, "Static array length mismatch");
-		T output;
-		foreach (i, JSONValue newNode; node.array)
-			output[i] = fromJSON!(ForeachType!T, flags)(newNode, path);
-		return output;
-	} else static if(isAssociativeArray!T) {
-		expect(node, JSONType.object);
-		T output;
-		foreach (string key, JSONValue value; node.object)
-			output[key] = fromJSON!(ValueType!T, flags)(value, path);
-		return output;
-	} else static if (is(T == bool)) {
-		expect(node, JSONType.true_, JSONType.false_);
-		if (node.type == JSONType.true_)
-			return true;
-		else if (node.type == JSONType.false_)
-			return false;
-		assert(false);
-	} else
-		static assert(false, "Cannot read type "~T.stringof~" from JSON"); //unreachable, hopefully.
-}
 private void expect(T...)(JSONValue node, T types) {
 	import std.algorithm : among;
 	import std.exception : enforce;
 	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
 }
-private @property JSONValue toJSON(BitFlags!Siryulize flags, T)(T type) if (!isInfinite!T) {
-	import std.conv : text, to;
-	import std.meta : AliasSeq;
-	import std.range : isInputRange;
-	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isPointer, isSomeChar, isSomeString, isStaticArray, PointerTarget, Unqual;
-	JSONValue output;
-	static if (isPointer!T) {
-		alias Undecorated = Unqual!(PointerTarget!T);
-	} else {
-		alias Undecorated = Unqual!T;
-	}
-	static if (is(T == struct) && hasSerializationMethod!T) {
-		output = toJSON!flags(mixin("type."~__traits(identifier, serializationMethod!T)));
-	} else static if (hasUDA!(type, AsString) || is(Undecorated == enum)) {
-		output = JSONValue(type.text);
-	} else static if (isNullable!Undecorated) {
-		if (type.isNull && !(flags & Siryulize.omitNulls)) {
-			output = JSONValue();
+template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == enum)) {
+		import std.conv : to;
+		import std.traits : OriginalType;
+		if (value.type == JSONType.string) {
+			result = value.str.to!T;
 		} else {
-			output = type.get().toJSON!flags;
+			OriginalType!T tmp;
+			deserialize(value, path, tmp);
+			result = tmp.to!T;
 		}
-	} else static if (isTimeType!Undecorated) {
-		output = JSONValue(type.toISOExtString());
-	} else static if (canStoreUnchanged!Undecorated) {
-		output = JSONValue(type.to!Undecorated);
-	} else static if (isSomeString!Undecorated || (isStaticArray!Undecorated && isSomeChar!(ElementType!Undecorated))) {
-		import std.utf : toUTF8;
-		output = JSONValue(type[].toUTF8);
-	} else static if (isSomeChar!Undecorated) {
-		output = [type].idup.toJSON!flags;
-	} else static if (isAssociativeArray!Undecorated) {
-		string[string] arr;
-		output = JSONValue(arr);
-		foreach (key, value; type) {
-			output.object[key] = value.toJSON!flags;
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isIntegral!T && !is(T == enum)) {
+		import std.conv : to;
+		expect(value, JSONType.integer, JSONType.string);
+		if (value.type == JSONType.string) {
+			result = value.str.to!T;
+		} else {
+			result = value.integer.to!T;
 		}
-	} else static if (isSimpleList!Undecorated) {
-		string[] arr;
-		output = JSONValue(arr);
-		foreach (value; type) {
-			output.array ~= value.toJSON!flags;
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isNullable!T) {
+		if (value.type == JSONType.null_) {
+			result.nullify();
+		} else {
+			typeof(result.get) tmp;
+			deserialize(value, path, tmp);
+			result = tmp;
 		}
-	} else static if (is(Undecorated == struct)) {
-		string[string] arr;
-		output = JSONValue(arr);
-		foreach (member; FieldNameTuple!Undecorated) {
-			static if (__traits(getProtection, __traits(getMember, Undecorated, member)) == "public") {
-				static if (!!(flags & Siryulize.omitInits)) {
-					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
-						if (__traits(getMember, type, member).isNull) {
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isFloatingPoint!T) {
+		import std.conv : to;
+		expect(value, JSONType.float_, JSONType.integer, JSONType.string);
+		if (value.type == JSONType.string) {
+			result =value.str.to!T;
+		} else if (value.type == JSONType.integer) {
+			result = value.integer.to!T;
+		} else {
+			result = value.floating.to!T;
+		}
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeString!T) {
+		import std.conv : to;
+		expect(value, JSONType.string, JSONType.integer, JSONType.null_);
+		if (value.type == JSONType.integer) {
+			result = value.integer.to!T;
+		} else if (value.type == JSONType.null_) {
+			result = T.init;
+		} else {
+			result = value.str.to!T;
+		}
+	}
+	void deserialize(T : P*, P)(JSONValue value, string path, out T result) {
+		result = new P;
+		deserialize(value, path, *result);
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T) {
+		static if (hasDeserializationMethod!T) {
+			Parameters!(deserializationMethod!T) tmp;
+			deserialize(value, path, tmp);
+			result = deserializationMethod!T(tmp);
+		} else static if (isTimeType!T) {
+			string dateString;
+			deserialize(value, path, dateString);
+			result = T.fromISOExtString(dateString);
+		} else {
+			import std.exception : enforce;
+			import std.meta : AliasSeq;
+			import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+			expect(value, JSONType.object);
+			foreach (member; FieldNameTuple!T) {
+				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+					debug string newPath = path~"."~member;
+					else string newPath = path;
+					alias field = AliasSeq!(__traits(getMember, T, member));
+					enum memberName = getMemberName!field;
+					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
+						if ((memberName !in value.object) || (value.object[memberName].type == JSONType.null_)) {
 							continue;
 						}
 					} else {
-						if (__traits(getMember, type, member) == __traits(getMember, type, member).init) {
-							continue;
+						enforce!JSONDException(memberName in value.object, "Missing non-@Optional "~memberName~" in node");
+					}
+					alias fromFunc = getConvertFromFunc!(T, field);
+					try {
+						Parameters!(fromFunc)[0] param;
+						static if (hasUDA!(field, IgnoreErrors)) {
+							try {
+								deserialize(value[memberName], newPath, param);
+								__traits(getMember, result, member) = fromFunc(param);
+							} catch (UnexpectedTypeException) {} //just skip it
+						} else {
+							deserialize(value[memberName], newPath, param);
+							__traits(getMember, result, member) = fromFunc(param);
 						}
+					} catch (Exception e) {
+						e.msg = "Error deserializing "~newPath~": "~e.msg;
+						throw e;
 					}
 				}
-				enum memberName = getMemberName!(__traits(getMember, Undecorated, member));
-				output.object[memberName] = getConvertToFunc!(T, __traits(getMember, Undecorated, member))(mixin("type."~member)).toJSON!flags;
 			}
 		}
-	} else {
-		static assert(false, "Cannot write type "~T.stringof~" to JSON"); //unreachable, hopefully
 	}
-	return output;
+	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeChar!T) {
+		import std.conv : to;
+		import std.range.primitives : front;
+		expect(value, JSONType.string, JSONType.null_);
+		if (value.type == JSONType.null_) {
+			result = T.init;
+		} else {
+			result = value.str.front.to!T;
+		}
+	}
+	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
+		import std.conv : text;
+		expect(values, JSONType.array);
+		result = new T(values.array.length);
+		foreach (idx, ref element; result) {
+			debug string newPath = path ~ "["~idx.text~"]";
+			else string newPath = path;
+			deserialize(values[idx], newPath, element);
+		}
+	}
+	void deserialize(T)(JSONValue values, string path, out T result) if (isStaticArray!T) {
+		import std.conv : text;
+		import std.traits : ForeachType;
+		static if (isSomeChar!(ElementType!T)) {
+			import std.range : enumerate;
+			import std.utf : byCodeUnit;
+			expect(values, JSONType.string);
+			string str;
+			deserialize(values, path, str);
+			foreach (i, ref chr; result) {
+				chr = str[i];
+			}
+		} else {
+			import std.exception : enforce;
+			expect(values, JSONType.array);
+			enforce!JSONDException(values.array.length == T.length, "Static array length mismatch");
+			foreach (i, JSONValue newNode; values.array) {
+				debug string newPath = path ~ "["~i.text~"]";
+				else string newPath = path;
+				deserialize(newNode, newPath, result[i]);
+			}
+		}
+	}
+
+	void deserialize(T)(JSONValue values, string path, out T result) if (isAssociativeArray!T) {
+		import std.traits : ValueType;
+		expect(values, JSONType.object);
+		foreach (string key, JSONValue value; values.object) {
+			debug string newPath = path ~ "["~key~"]";
+			else string newPath = path;
+			ValueType!T v;
+			deserialize(value, newPath, v);
+			result[key] = v;
+		}
+	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == bool)) {
+		expect(value, JSONType.true_, JSONType.false_);
+		if (value.type == JSONType.true_) {
+			result = true;
+		} else if (value.type == JSONType.false_) {
+			result = false;
+		} else {
+			assert(false);
+		}
+	}
+	void deserialize(JSONValue, string, out typeof(null)) {}
 }
-private template isTimeType(T) {
-	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
-	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
+
+template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
+	import std.traits : hasUDA;
+	private auto serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
+		static if (hasSerializationMethod!T) {
+			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
+		} else {
+			import std.traits : FieldNameTuple;
+			string[string] arr;
+			auto output = JSONValue(arr);
+			foreach (member; FieldNameTuple!T) {
+				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+					static if (!!(flags & Siryulize.omitInits)) {
+						static if (isNullable!(typeof(__traits(getMember, T, member)))) {
+							if (__traits(getMember, value, member).isNull) {
+								continue;
+							}
+						} else {
+							if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
+								continue;
+							}
+						}
+					}
+					enum memberName = getMemberName!(__traits(getMember, T, member));
+					output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
+				}
+			}
+			return output;
+		}
+	}
+	private auto serialize(T)(auto ref const T value) if (isNullable!T) {
+		if (value.isNull) {
+			return serialize(null);
+		} else {
+			return serialize(value.get);
+		}
+	}
+	private auto serialize(const typeof(null) value) {
+		return JSONValue();
+	}
+	private auto serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+		import std.conv : text;
+		return JSONValue(value.text);
+	}
+	private auto serialize(T)(auto ref const T value) if (isPointer!T) {
+		return serialize(*value);
+	}
+	private auto serialize(T)(auto ref const T value) if (isTimeType!T) {
+		return JSONValue(value.toISOExtString());
+	}
+	private auto serialize(T)(auto ref const T value) if (isSomeChar!T) {
+		return JSONValue([value]);
+	}
+	private auto serialize(T)(auto ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
+		import std.utf : toUTF8;
+		return JSONValue(value[].toUTF8);
+	}
+	private auto serialize(T)(auto ref const T value) if (canStoreUnchanged!T && !is(T == enum)) {
+		return JSONValue(value);
+	}
+	private auto serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T) {
+		string[] arr;
+		auto output = JSONValue(arr);
+		foreach (value; values) {
+			output.array ~= serialize(value);
+		}
+		return output;
+	}
+	private auto serialize(T)(auto ref T values) if (isAssociativeArray!T) {
+		string[string] arr;
+		auto output = JSONValue(arr);
+		foreach (key, value; values) {
+			output.object[key] = serialize(value);
+		}
+		return output;
+	}
 }
 private template canStoreUnchanged(T) {
 	import std.traits : isFloatingPoint, isIntegral;

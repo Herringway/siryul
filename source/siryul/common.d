@@ -1,8 +1,8 @@
 module siryul.common;
 import std.meta : templateAnd, templateNot, templateOr;
 import std.range : isInputRange;
-import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
-import std.typecons : Nullable, NullableRef;
+import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isInstanceOf, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
+import std.typecons : BitFlags, Nullable, NullableRef;
 ///Serialization options
 enum Siryulize {
 	none, ///Default behaviour
@@ -39,12 +39,7 @@ class DeserializeException : SiryulException {
 	}
 }
 
-package template isNullable(T) {
-	static if(__traits(compiles, TemplateArgsOf!T) && __traits(compiles, Nullable!(TemplateArgsOf!T)) && is(T == Nullable!(TemplateArgsOf!T)))
-		enum isNullable = true;
-	else
-		enum isNullable = false;
-}
+package enum isNullable(T) = isInstanceOf!(Nullable, T);
 static assert(isNullable!(Nullable!int));
 static assert(isNullable!(Nullable!(int, 0)));
 static assert(!isNullable!int);
@@ -94,12 +89,14 @@ alias serializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod)[0];
 enum hasDeserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod).length == 1;
 alias deserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod)[0];
 
-alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString);
+alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString, templateNot!isAssociativeArray);
 static assert(isSimpleList!(int[]));
 static assert(isSimpleList!(string[]));
 static assert(!isSimpleList!(string));
 static assert(!isSimpleList!(char[]));
 static assert(!isSimpleList!(int));
+static assert(!isSimpleList!(int[string]));
+static assert(isSimpleList!(char[10]));
 
 package template getMemberName(alias T) {
 	static if (hasUDA!(T, SiryulizeAs)) {
@@ -182,4 +179,14 @@ unittest {
 	assert(getConvertFromFunc!(TimeTest, TimeTest.nothing)("test") == "test");
 	assert(getConvertFromFunc!(TimeTest2, TimeTest2.time)("yep") == SysTime.min);
 	assert(getConvertFromFunc!(TimeTest2, TimeTest2.nothing)("test") == "test");
+}
+
+template isStaticString(T) {
+	import std.range : ElementType;
+	import std.traits : isSomeChar, isStaticArray;
+	enum isStaticString = isStaticArray!T && isSomeChar!(ElementType!T);
+}
+template isTimeType(T) {
+	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
+	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
 }

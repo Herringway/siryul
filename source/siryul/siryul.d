@@ -222,6 +222,7 @@ unittest {
 	assertThrown(3.toFile("file.obviouslybadextension"));
 }
 version(unittest) {
+	struct Empty {}
 	struct Test2 {
 		string inner;
 	}
@@ -300,6 +301,7 @@ version(unittest) {
 				const constExpected = cast(const)expected;
 			}
 			debug(verbosetesting) {
+				writeln("-----");
 				static if (isPointer!T) {
 					writeln("Input:\n ", *input);
 				} else {
@@ -364,7 +366,8 @@ version(unittest) {
 	int[4] staticArray = [0, 1, 2, 3];
 	runTest(staticArray);
 
-
+	runTest(Nullable!int(4));
+	runTest2(Nullable!int(), null);
 	runTest(TimeOfDay(1, 1, 1));
 	runTest(Date(2000, 1, 1));
 	runTest(DateTime(2000, 1, 1, 1, 1, 1));
@@ -415,7 +418,7 @@ version(unittest) {
 	runTest(testval);
 	foreach (siryulizer; siryulizers) {
 		assert(TestNull2().toString!siryulizer.fromString!(TestNull2, siryulizer).value.isNull);
-		assert(siryulizer.emptyObject.fromString!(TestNull2, siryulizer).value.isNull);
+		assert(Empty().toString!siryulizer.fromString!(TestNull2, siryulizer).value.isNull);
 	}
 
 	runTest2Fail!bool("b");
