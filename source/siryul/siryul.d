@@ -518,6 +518,18 @@ version(unittest) {
 		}
 	}
 	runTest2(CustomSerializer(true), false);
+
+	static struct RequiredTest {
+		@Required bool x;
+		int y;
+	}
+	static struct RequiredTest2 {
+		int y;
+	}
+	foreach (siryulizer; siryulizers) {
+		assert(Empty().toString!siryulizer.fromString!(RequiredTest2, siryulizer, DeSiryulize.optionalByDefault).y == 0, "Required test failed for "~siryulizer.stringof);
+		assertThrown(RequiredTest2(4).toString!siryulizer.fromString!(RequiredTest, siryulizer, DeSiryulize.optionalByDefault), "Required test failed for "~siryulizer.stringof);
+	}
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

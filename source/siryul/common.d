@@ -59,6 +59,10 @@ struct SiryulizeAs {
  + the default value cannot appear in the data or use a Nullable type.
  +/
 enum Optional;
+
+///Used when nonpresence of field is an error.
+enum Required;
+
 /++
  + Use custom parser functions for a given field.
  +

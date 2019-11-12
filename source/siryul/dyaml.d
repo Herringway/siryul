@@ -145,7 +145,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 					else string newPath = path;
 					alias field = AliasSeq!(__traits(getMember, T, member));
 					enum memberName = getMemberName!field;
-					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault))) || hasIndirections!(typeof(field))) {
+					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
 						if (memberName !in value) {
 							continue;
 						}
