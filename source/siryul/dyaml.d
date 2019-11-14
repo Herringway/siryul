@@ -71,8 +71,8 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			result = tmp.to!T;
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == TimeOfDay)) {
-		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+	void deserialize(Node value, string path, out TimeOfDay result) {
+		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a TimeOfDay");
 		result = TimeOfDay.fromISOExtString(value.get!string);
 	}
 	void deserialize(T)(Node value, string path, out T result) if (isNullable!T) {
@@ -183,12 +183,12 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			result = cast(T)value.get!string.front;
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (isSomeString!T && !canStoreUnchanged!T && !is(T == enum)) {
+	void deserialize(T)(Node value, string path, out T result) if (isSomeString!T && !canStoreUnchanged!T) {
 		string str;
 		deserialize(value, path, str);
 		result = str.to!T;
 	}
-	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T && !is(T == enum)) {
+	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T) {
 		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
 		if (value.tag == `tag:yaml.org,2002:str`) {
 			result = value.get!string.to!T;
@@ -228,7 +228,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	private auto serialize(T)(const T value) if (isSomeChar!T) {
 		return serialize([value]);
 	}
-	private auto serialize(T)(const T value) if (canStoreUnchanged!T && !is(T == enum)) {
+	private auto serialize(T)(const T value) if (canStoreUnchanged!T) {
 		return Node(value.to!T);
 	}
 	private auto serialize(T)(const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
@@ -325,5 +325,5 @@ private template expectedTag(T) {
 }
 private template canStoreUnchanged(T) {
 	import std.traits : isFloatingPoint, isIntegral;
-	enum canStoreUnchanged = isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string);
+	enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string));
 }
