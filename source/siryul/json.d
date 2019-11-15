@@ -201,7 +201,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	import std.traits : hasUDA;
-	private auto serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
+	private JSONValue serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
 		static if (hasSerializationMethod!T) {
 			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
 		} else {
@@ -228,37 +228,37 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 			return output;
 		}
 	}
-	private auto serialize(T)(auto ref const T value) if (isNullable!T) {
+	private JSONValue serialize(T)(auto ref const T value) if (isNullable!T) {
 		if (value.isNull) {
 			return serialize(null);
 		} else {
 			return serialize(value.get);
 		}
 	}
-	private auto serialize(const typeof(null) value) {
+	private JSONValue serialize(const typeof(null) value) {
 		return JSONValue();
 	}
-	private auto serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private JSONValue serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
 		import std.conv : text;
 		return JSONValue(value.text);
 	}
-	private auto serialize(T)(auto ref const T value) if (isPointer!T) {
+	private JSONValue serialize(T)(auto ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private auto serialize(T)(auto ref const T value) if (isTimeType!T) {
+	private JSONValue serialize(T)(auto ref const T value) if (isTimeType!T) {
 		return JSONValue(value.toISOExtString());
 	}
-	private auto serialize(T)(auto ref const T value) if (isSomeChar!T) {
+	private JSONValue serialize(T)(auto ref const T value) if (isSomeChar!T) {
 		return JSONValue([value]);
 	}
-	private auto serialize(T)(auto ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
+	private JSONValue serialize(T)(auto ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
 		import std.utf : toUTF8;
 		return JSONValue(value[].toUTF8);
 	}
-	private auto serialize(T)(auto ref const T value) if (canStoreUnchanged!T && !is(T == enum)) {
+	private JSONValue serialize(T)(auto ref const T value) if (canStoreUnchanged!T && !is(T == enum)) {
 		return JSONValue(value);
 	}
-	private auto serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T) {
+	private JSONValue serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T) {
 		string[] arr;
 		auto output = JSONValue(arr);
 		foreach (value; values) {
@@ -266,7 +266,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		}
 		return output;
 	}
-	private auto serialize(T)(auto ref T values) if (isAssociativeArray!T) {
+	private JSONValue serialize(T)(auto ref T values) if (isAssociativeArray!T) {
 		string[string] arr;
 		auto output = JSONValue(arr);
 		foreach (key, value; values) {

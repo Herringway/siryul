@@ -216,46 +216,46 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
-	private auto serialize(const typeof(null) value) {
+	private Node serialize(const typeof(null) value) {
 		return Node(YAMLNull());
 	}
-	private auto serialize(const SysTime value) {
+	private Node serialize(const SysTime value) {
 		return Node(value.to!SysTime, "tag:yaml.org,2002:timestamp");
 	}
-	private auto serialize(const TimeOfDay value) {
+	private Node serialize(const TimeOfDay value) {
 		return Node(value.toISOExtString);
 	}
-	private auto serialize(T)(const T value) if (isSomeChar!T) {
+	private Node serialize(T)(const T value) if (isSomeChar!T) {
 		return serialize([value]);
 	}
-	private auto serialize(T)(const T value) if (canStoreUnchanged!T) {
+	private Node serialize(T)(const T value) if (canStoreUnchanged!T) {
 		return Node(value.to!T);
 	}
-	private auto serialize(T)(const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
+	private Node serialize(T)(const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
 		import std.utf : toUTF8;
 		return serialize(value[].toUTF8().idup);
 	}
-	private auto serialize(T)(const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private Node serialize(T)(const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
 		return Node(value.text);
 	}
-	private auto serialize(T)(const T value) if (isAssociativeArray!T) {
+	private Node serialize(T)(const T value) if (isAssociativeArray!T) {
 		Node[Node] output;
 		foreach (k, v; value) {
 			output[serialize(k)] = serialize(v);
 		}
 		return Node(output);
 	}
-	private auto serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T)) {
+	private Node serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T)) {
 		Node[] output;
 		foreach (value; values) {
 			output ~= serialize(value);
 		}
 		return Node(output);
 	}
-	private auto serialize(T)(auto ref const T value) if (isPointer!T) {
+	private Node serialize(T)(auto ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private auto serialize(T)(const T value) if (is(T == struct)) {
+	private Node serialize(T)(const T value) if (is(T == struct)) {
 		static if (hasSerializationMethod!T) {
 			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
 		} else static if (is(T == Date) || is(T == DateTime)) {
