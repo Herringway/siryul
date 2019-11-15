@@ -18,7 +18,7 @@ struct YAML {
 		auto loader = Loader.fromString(str).load();
 		try {
 			T result;
-			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader, "", result);
+			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader, T.stringof, result);
 			return result;
 		} catch (NodeException e) {
 			debug(norethrow) throw e;
