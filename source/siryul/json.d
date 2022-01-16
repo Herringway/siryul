@@ -12,7 +12,7 @@ private import std.typecons;
 struct JSON {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!".json";
-	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
+	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		T output;
 		deserialize!(JSON, BitFlags!DeSiryulize(flags))(parseJSON(data), T.stringof, output);
 		return output;

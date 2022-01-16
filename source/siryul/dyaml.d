@@ -11,14 +11,15 @@ import std.typecons;
 struct YAML {
 	private import std.meta : AliasSeq;
 	package alias types = AliasSeq!(".yml", ".yaml");
-	package static T parseInput(T, DeSiryulize flags, U)(U data) if (isInputRange!U && isSomeChar!(ElementType!U)) {
+	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.utf : byChar;
 		auto str = data.byChar.to!(char[]);
-		auto loader = Loader.fromString(str).load();
+		auto loader = Loader.fromString(str);
+		loader.name = filename;
 		try {
 			T result;
-			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader, T.stringof, result);
+			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader.load(), T.stringof, result);
 			return result;
 		} catch (NodeException e) {
 			debug(norethrow) throw e;
@@ -39,9 +40,28 @@ struct YAML {
 /++
  + Thrown on YAML deserialization errors
  +/
+class YAMLUnexpectedNodeIDException : YAMLDException {
+	this(const Node node, NodeID id, string file = __FILE__, size_t line = __LINE__) @safe nothrow {
+		import std.format : format;
+		try {
+			super(node.startMark, format!"Expected a %s, got a %s"(id, node.nodeID), file, line);
+		} catch (Exception) { assert(0); }
+	}
+}
+/++
+ + Thrown on YAML deserialization errors
+ +/
 class YAMLDException : DeserializeException {
 	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
+	}
+	this(const Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		import std.conv : text;
+		try {
+			super(text(mark, ": ", msg), file, line);
+		} catch (Exception) {
+			assert(0);
+		}
 	}
 }
 /++
@@ -51,6 +71,11 @@ class YAMLSException : SerializeException {
 	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
+}
+private void expect(Node node, NodeID expected, string file = __FILE__, ulong line = __LINE__) {
+	import std.algorithm : among;
+	import std.exception : enforce;
+	enforce(node.nodeID == expected, new YAMLUnexpectedNodeIDException(node, expected, file, line));
 }
 template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	import std.conv : to;
@@ -62,7 +87,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
 		import std.conv : to;
 		import std.traits : OriginalType;
-		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		expect(value, NodeID.scalar);
 		if (value.tag == `tag:yaml.org,2002:str`) {
 			result = value.get!string.to!T;
 		} else {
@@ -72,7 +97,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		}
 	}
 	void deserialize(Node value, string path, out TimeOfDay result) {
-		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a TimeOfDay");
+		expect(value, NodeID.scalar);
 		result = TimeOfDay.fromISOExtString(value.get!string);
 	}
 	void deserialize(T)(Node value, string path, out T result) if (isNullable!T) {
@@ -85,11 +110,11 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		}
 	}
 	void deserialize(Node value, string path, out bool result) {
-		enforce!YAMLDException(value.tag == `tag:yaml.org,2002:bool`, "Expecting a boolean value");
+		enforce(value.tag == `tag:yaml.org,2002:bool`, new YAMLDException(value.startMark, "Expecting a boolean value"));
 		result = value.get!bool;
 	}
 	void deserialize(V, K)(Node value, string path, out V[K] result) {
-		enforce!YAMLDException(value.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~(V[K]).stringof);
+		expect(value, NodeID.mapping);
 		foreach (Node k, Node v; value) {
 			K key;
 			V val;
@@ -100,19 +125,19 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	}
 	void deserialize(T, size_t N)(Node value, string path, out T[N] result) {
 		static if (isSomeChar!T) {
-			enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~(T[N]).stringof);
+			expect(value, NodeID.scalar);
 			ForeachType!(T[N])[] str;
 			deserialize(value, path, str);
 			foreach (i, chr; str.byCodeUnit.enumerate(0)) {
-				enforce!YAMLDException(i < N, "Static array too small to contain all elements");
+				enforce(i < N, new YAMLDException(value.startMark, "Static array too small to contain all elements"));
 				result[i] = chr;
 			}
 			return;
 		} else {
-			enforce!YAMLDException(value.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~(T[N]).stringof);
+			expect(value, NodeID.sequence);
 			size_t i;
 			foreach (Node newNode; value) {
-				enforce!YAMLDException(i < N, "Static array too small to contain all elements");
+				enforce(i < N, new YAMLDException(value.startMark, "Static array too small to contain all elements"));
 				deserialize(newNode, path, result[i++]);
 			}
 			return;
@@ -120,7 +145,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	}
 	void deserialize(T)(Node value, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
 		if (value.type != NodeType.null_) {
-			enforce!YAMLDException(value.nodeID == NodeID.sequence, "Attempted to read a non-sequence as a "~T.stringof);
+			expect(value, NodeID.sequence);
 			foreach (Node newNode; value) {
 				ElementType!T ele;
 				deserialize(newNode, path, ele);
@@ -138,7 +163,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			import std.exception : enforce;
 			import std.meta : AliasSeq;
 			import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-			enforce!YAMLDException(value.nodeID == NodeID.mapping, "Attempted to read a non-mapping as a "~T.stringof);
+			expect(value, NodeID.mapping);
 			foreach (member; FieldNameTuple!T) {
 				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
 					debug string newPath = path~"."~member;
@@ -150,7 +175,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 							continue;
 						}
 					} else {
-						enforce!YAMLDException(memberName in value, "Missing non-@Optional "~memberName~" in node");
+						enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
 					}
 					alias fromFunc = getConvertFromFunc!(T, field);
 					try {
@@ -173,13 +198,13 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		}
 	}
 	void deserialize(T)(Node value, string path, out T result) if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
-		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		expect(value, NodeID.scalar);
 		result = value.get!SysTime.to!T;
 	}
 	void deserialize(T)(Node value, string path, out T result) if (isSomeChar!T) {
 		import std.array : front;
 		if (value.type != NodeType.null_) {
-			enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+			expect(value, NodeID.scalar);
 			result = cast(T)value.get!string.front;
 		}
 	}
@@ -189,15 +214,15 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		result = str.to!T;
 	}
 	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T) {
-		enforce!YAMLDException(value.nodeID == NodeID.scalar, "Attempted to read a non-scalar as a "~T.stringof);
+		expect(value, NodeID.scalar);
 		if (value.tag == `tag:yaml.org,2002:str`) {
 			result = value.get!string.to!T;
 		} else {
 			static if (isIntegral!T) {
-				enforce!YAMLDException(value.tag == `tag:yaml.org,2002:int`, "Attempted to read a float as an integer");
+				enforce(value.tag == `tag:yaml.org,2002:int`, new YAMLDException(value.startMark, "Attempted to read a float as an integer"));
 				result = value.get!T;
 			} else static if (isSomeString!T) {
-				enforce!YAMLDException(value.tag != `tag:yaml.org,2002:bool`, "Attempted to read a non-string as a string");
+				enforce(value.tag != `tag:yaml.org,2002:bool`, new YAMLDException(value.startMark, "Attempted to read a non-string as a string"));
 				if (value.type != NodeType.null_) {
 					result = value.get!T;
 				}

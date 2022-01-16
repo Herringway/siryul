@@ -44,7 +44,7 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 	} else { //Not autodetecting
 		import std.algorithm : joiner;
 		import std.stdio : File, KeepTerminator;
-		return fromString!(T, Format, flags)(File(path, "r").byLine(KeepTerminator.yes).joiner());
+		return Format.parseInput!(T, flags)(File(path, "r").byLine(KeepTerminator.yes).joiner(), path);
 	}
 }
 ///
@@ -96,7 +96,7 @@ unittest {
  + Returns: Data contained in the string
  +/
 T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str) if (isSiryulizer!Format && isInputRange!U) {
-	return Format.parseInput!(T, flags)(str);
+	return Format.parseInput!(T, flags)(str, "<string>");
 }
 ///
 unittest {
