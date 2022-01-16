@@ -297,7 +297,7 @@ version(unittest) {
 			static if (flag == SkipImmutable.no) {
 				immutable immutableTest = cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer);
 				immutable immutableExpected = cast(immutable)expected;
-				const constTest = (cast(const(T))input).toFormattedString!siryulizer.fromString!(U, siryulizer);
+				const constTest = (cast(const)input).toFormattedString!siryulizer.fromString!(U, siryulizer);
 				const constExpected = cast(const)expected;
 			}
 			debug(verbosetesting) {
