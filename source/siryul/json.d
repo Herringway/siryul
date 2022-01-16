@@ -71,9 +71,11 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeString!T) {
 		import std.conv : to;
-		expect(value, JSONType.string, JSONType.integer, JSONType.null_);
+		expect(value, JSONType.string, JSONType.integer, JSONType.null_, JSONType.float_);
 		if (value.type == JSONType.integer) {
 			result = value.integer.to!T;
+		} else if (value.type == JSONType.float_) {
+			result = value.floating.to!T;
 		} else if (value.type == JSONType.null_) {
 			result = T.init;
 		} else {
