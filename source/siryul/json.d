@@ -23,10 +23,10 @@ struct JSON {
 	}
 }
 
-private void expect(T...)(JSONValue node, T types) {
+private void expect(T...)(JSONValue node, T types, string file = __FILE__, ulong line = __LINE__) {
 	import std.algorithm : among;
 	import std.exception : enforce;
-	enforce(node.type.among(types), new UnexpectedTypeException(types[0], node.type));
+	enforce(node.type.among(types), new UnexpectedTypeException([types], node.type, file, line));
 }
 template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == enum)) {
@@ -291,9 +291,10 @@ class JSONDException : DeserializeException {
 + Thrown when a JSON value has an unexpected type.
 +/
 class UnexpectedTypeException : JSONDException {
-	package this(JSONType expectedType, JSONType unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	package this(JSONType[] expectedTypes, JSONType unexpectedType, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
+		import std.format : format;
 		import std.exception : assumeWontThrow, ifThrown;
-		super("Expecting JSON type "~assumeWontThrow(expectedType.text.ifThrown("Unknown"))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
+		super("Expecting JSON types "~assumeWontThrow(format!"%(%s, %)"(expectedTypes))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
 	}
 }
