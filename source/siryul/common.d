@@ -1,6 +1,6 @@
 module siryul.common;
 import std.meta : templateAnd, templateNot, templateOr;
-import std.range : isInputRange;
+import std.range : isInputRange, isOutputRange;
 import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isInstanceOf, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
 import std.typecons : BitFlags, Nullable, NullableRef;
 ///Serialization options
@@ -34,8 +34,26 @@ class SerializeException : SiryulException {
  + Thrown when a deserialization error occurs
  +/
 class DeserializeException : SiryulException {
+	ErrorMark mark;
 	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
+	}
+	package this(ErrorMark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		import std.conv : text;
+		this.mark = mark;
+		try {
+			super(text(mark, ": ",msg), file, line);
+		} catch (Exception) { assert(0); }
+	}
+}
+
+struct ErrorMark {
+	string filename = "<unknown>";
+	ulong line;
+	ulong column;
+	void toString(T)(T sink) const if (isOutputRange!(T, char[])) {
+		import std.format : formattedWrite;
+		sink.formattedWrite!"%s (line %s, column %s)"(filename, line, column);
 	}
 }
 

@@ -23,7 +23,7 @@ struct YAML {
 			return result;
 		} catch (NodeException e) {
 			debug(norethrow) throw e;
-			else throw new YAMLDException(e.msg);
+			else throw new YAMLDException(Mark(filename, 0, 0), e.msg);
 		}
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -52,16 +52,12 @@ class YAMLUnexpectedNodeIDException : YAMLDException {
  + Thrown on YAML deserialization errors
  +/
 class YAMLDException : DeserializeException {
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
 	this(const Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		import std.conv : text;
-		try {
-			super(text(mark, ": ", msg), file, line);
-		} catch (Exception) {
-			assert(0);
-		}
+		ErrorMark siryulMark;
+		siryulMark.filename = mark.name;
+		siryulMark.line = mark.line;
+		siryulMark.column = mark.column;
+		super(siryulMark, msg, file, line);
 	}
 }
 /++
