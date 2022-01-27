@@ -557,7 +557,7 @@ static assert(!isTimeType!(DateTime[]));
 template isSiryulizer(T) {
 	debug enum isSiryulizer = true;
 	else enum isSiryulizer = __traits(compiles, () {
-		uint val = T.parseInput!(uint, DeSiryulize.none)("");
+		uint val = T.parseInput!(uint, DeSiryulize.none)("", "");
 		string str = T.asString!(Siryulize.none)(3);
 	});
 }
