@@ -43,8 +43,9 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 		}
 	} else { //Not autodetecting
 		import std.algorithm : joiner;
-		import std.stdio : File, KeepTerminator;
-		return Format.parseInput!(T, flags)(File(path, "r").byLine(KeepTerminator.yes).joiner(), path);
+		import std.file : read;
+		auto lines = () @trusted { return cast(string)read(path); }();
+		return Format.parseInput!(T, flags)(lines, path);
 	}
 }
 ///
@@ -294,12 +295,6 @@ version(unittest) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
 			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
-			static if (flag == SkipImmutable.no) {
-				immutable immutableTest = cast(immutable)(cast(immutable)input).toFormattedString!siryulizer.fromString!(U, siryulizer);
-				immutable immutableExpected = cast(immutable)expected;
-				const constTest = (cast(const)input).toFormattedString!siryulizer.fromString!(U, siryulizer);
-				const constExpected = cast(const)expected;
-			}
 			debug(verbosetesting) {
 				writeln("-----");
 				static if (isPointer!T) {
@@ -318,19 +313,11 @@ version(unittest) {
 				auto vals = format("expected %s, got %s", *expected, *gotYAMLValue);
 				auto valsOmit = format("expected %s, got %s", *expected, *gotYAMLValueOmit);
 				assert(*gotYAMLValue == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				static if (flag == SkipImmutable.no) {
-					assert(*constTest == *constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-					assert(*immutableTest == *immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				}
 				assert(*gotYAMLValueOmit == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 			} else {
 				auto vals = format("expected %s, got %s", expected, gotYAMLValue);
 				auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
 				assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				static if (flag == SkipImmutable.no) {
-					assert(constTest == constExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-					assert(immutableTest == immutableExpected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				}
 				assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
 			}
 		}

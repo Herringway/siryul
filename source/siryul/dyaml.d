@@ -68,7 +68,7 @@ class YAMLSException : SerializeException {
 		super(msg, file, line);
 	}
 }
-private void expect(Node node, NodeID expected, string file = __FILE__, ulong line = __LINE__) {
+private void expect(Node node, NodeID expected, string file = __FILE__, ulong line = __LINE__) @safe {
 	import std.algorithm : among;
 	import std.exception : enforce;
 	enforce(node.nodeID == expected, new YAMLUnexpectedNodeIDException(node, expected, file, line));

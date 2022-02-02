@@ -107,11 +107,11 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 					alias field = AliasSeq!(__traits(getMember, T, member));
 					enum memberName = getMemberName!field;
 					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
-						if ((memberName !in value.object) || (value.object[memberName].type == JSONType.null_)) {
+						if ((memberName !in value.objectNoRef) || (value.objectNoRef[memberName].type == JSONType.null_)) {
 							continue;
 						}
 					} else {
-						enforce!JSONDException(memberName in value.object, "Missing non-@Optional "~memberName~" in node");
+						enforce!JSONDException(memberName in value.objectNoRef, "Missing non-@Optional "~memberName~" in node");
 					}
 					alias fromFunc = getConvertFromFunc!(T, field);
 					try {
@@ -146,7 +146,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
 		import std.conv : text;
 		expect(values, JSONType.array);
-		result = new T(values.array.length);
+		result = new T(values.arrayNoRef.length);
 		foreach (idx, ref element; result) {
 			debug string newPath = path ~ "["~idx.text~"]";
 			else string newPath = path;
@@ -168,8 +168,8 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		} else {
 			import std.exception : enforce;
 			expect(values, JSONType.array);
-			enforce!JSONDException(values.array.length == T.length, "Static array length mismatch");
-			foreach (i, JSONValue newNode; values.array) {
+			enforce!JSONDException(values.arrayNoRef.length == T.length, "Static array length mismatch");
+			foreach (i, JSONValue newNode; values.arrayNoRef) {
 				debug string newPath = path ~ "["~i.text~"]";
 				else string newPath = path;
 				deserialize(newNode, newPath, result[i]);
@@ -180,7 +180,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(JSONValue values, string path, out T result) if (isAssociativeArray!T) {
 		import std.traits : ValueType;
 		expect(values, JSONType.object);
-		foreach (string key, JSONValue value; values.object) {
+		foreach (string key, JSONValue value; values.objectNoRef) {
 			debug string newPath = path ~ "["~key~"]";
 			else string newPath = path;
 			ValueType!T v;
