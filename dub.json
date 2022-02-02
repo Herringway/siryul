@@ -1,7 +1,7 @@
 {
 	"name": "siryul",
 	"description": "A simple multi-format serialization library.",
-	"copyright": "Copyright © 2018, Cameron",
+	"copyright": "Copyright © 2022, Cameron",
 	"authors": ["Cameron \"Herringway\" Ross"],
 	"license": "BSL-1.0",
 	"homepage": "https://github.com/Herringway/siryul",
