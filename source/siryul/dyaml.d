@@ -10,7 +10,7 @@ import std.typecons;
  +/
 struct YAML {
 	private import std.meta : AliasSeq;
-	package alias types = AliasSeq!(".yml", ".yaml");
+	alias extensions = AliasSeq!(".yml", ".yaml");
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.utf : byChar;

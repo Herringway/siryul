@@ -33,7 +33,7 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 		import std.path : extension;
 		switch(path.extension) {
 			foreach (siryulizer; siryulizers) {
-				foreach (type; siryulizer.types) {
+				foreach (type; siryulizer.extensions) {
 					case type:
 						return fromFile!(T, siryulizer, flags)(path);
 				}
@@ -154,7 +154,7 @@ alias toFormattedString = toString;
 		import std.path : extension;
 		switch(path.extension) {
 			foreach (siryulizer; siryulizers) {
-				foreach (type; siryulizer.types) {
+				foreach (type; siryulizer.extensions) {
 					case type:
 						return data.toFile!(siryulizer, flags)(path);
 				}
