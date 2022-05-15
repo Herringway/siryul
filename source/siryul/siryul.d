@@ -49,7 +49,7 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 	}
 }
 ///
-unittest {
+@system unittest {
 	import std.exception : assertThrown;
 	import std.file : exists, remove;
 	import std.stdio : File;
