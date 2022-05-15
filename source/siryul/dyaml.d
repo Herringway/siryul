@@ -139,7 +139,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			return;
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
+	void deserialize(T)(Node value, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
 		if (value.type != NodeType.null_) {
 			expect(value, NodeID.sequence);
 			foreach (Node newNode; value) {
@@ -149,7 +149,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			}
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T) {
 		static if (hasDeserializationMethod!T) {
 			Parameters!(deserializationMethod!T) tmp;
 			deserialize(value, path, tmp);
@@ -266,7 +266,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 		}
 		return Node(output);
 	}
-	private Node serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T)) {
+	private Node serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T) && !isNullable!T) {
 		Node[] output;
 		foreach (value; values) {
 			output ~= serialize(value);

@@ -86,7 +86,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		result = new P;
 		deserialize(value, path, *result);
 	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T) {
 		static if (hasDeserializationMethod!T) {
 			Parameters!(deserializationMethod!T) tmp;
 			deserialize(value, path, tmp);
@@ -143,7 +143,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 			result = value.str.front.to!T;
 		}
 	}
-	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T) {
+	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
 		import std.conv : text;
 		expect(values, JSONType.array);
 		result = new T(values.arrayNoRef.length);
@@ -260,7 +260,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	private JSONValue serialize(T)(auto ref const T value) if (canStoreUnchanged!T && !is(T == enum)) {
 		return JSONValue(value);
 	}
-	private JSONValue serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T) {
+	private JSONValue serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
 		string[] arr;
 		auto output = JSONValue(arr);
 		foreach (value; values) {
