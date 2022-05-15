@@ -9,3 +9,5 @@ dub.selections.json
 *.lst
 docs
 *.a
+*.pdb
+.vs
