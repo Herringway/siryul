@@ -275,6 +275,7 @@ version(unittest) {
 	import std.format : format;
 	import std.meta : AliasSeq, Filter;
 	import std.stdio : writeln;
+	import std.sumtype : SumType;
 	import std.traits : Fields;
 	static assert(siryulizers.length > 0);
 	struct Test {
@@ -294,7 +295,9 @@ version(unittest) {
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
 			auto gotYAMLValue = input.toFormattedString!siryulizer.fromString!(U, siryulizer);
-			auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
+			static if (!isSumType!U) {
+				auto gotYAMLValueOmit = input.toFormattedString!(siryulizer, Siryulize.omitInits).fromString!(U, siryulizer, DeSiryulize.optionalByDefault);
+			}
 			debug(verbosetesting) {
 				writeln("-----");
 				static if (isPointer!T) {
@@ -310,15 +313,17 @@ version(unittest) {
 				}
 			}
 			static if (isPointer!T && isPointer!U) {
-				auto vals = format("expected %s, got %s", *expected, *gotYAMLValue);
-				auto valsOmit = format("expected %s, got %s", *expected, *gotYAMLValueOmit);
-				assert(*gotYAMLValue == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				assert(*gotYAMLValueOmit == *expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
+				assert(*gotYAMLValue == *expected, format("%s->%s->%s failed", T.stringof, siryulizer.stringof, U.stringof));
+				static if (!isSumType!U) {
+					assert(*gotYAMLValueOmit == *expected, format("%s->%s->%s failed", T.stringof, siryulizer.stringof, U.stringof));
+				}
 			} else {
 				auto vals = format("expected %s, got %s", expected, gotYAMLValue);
-				auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
 				assert(gotYAMLValue == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, vals));
-				assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
+				static if (!isSumType!U) {
+					auto valsOmit = format("expected %s, got %s", expected, gotYAMLValueOmit);
+					assert(gotYAMLValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, siryulizer.stringof, U.stringof, valsOmit));
+				}
 			}
 		}
 	}
@@ -545,6 +550,31 @@ version(unittest) {
 		assert(Empty().toString!siryulizer.fromString!(RequiredTest2, siryulizer, DeSiryulize.optionalByDefault).y == 0, "Required test failed for "~siryulizer.stringof);
 		assertThrown(RequiredTest2(4).toString!siryulizer.fromString!(RequiredTest, siryulizer, DeSiryulize.optionalByDefault), "Required test failed for "~siryulizer.stringof);
 	}
+	struct SumTestA {
+		int a;
+		string b;
+	}
+	struct SumTestB {
+		bool c;
+		float d;
+	}
+
+	alias Multiple = SumType!(SumTestA, SumTestB);
+	Multiple a = SumTestA(20, "hi");
+	Multiple b = SumTestB(true, 123.0);
+	Multiple c;
+	runTest(a);
+	runTest(b);
+	runTest(c);
+	runTest2(SumTestA(20, "hi"), a);
+	runTest2(SumTestB(true, 123.0), b);
+
+	static struct LargeStruct {
+		@disable this(this);
+		uint[0x10000] largeData;
+	}
+	auto largeVal = new LargeStruct;
+	runTest(largeVal);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

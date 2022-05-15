@@ -105,6 +105,17 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			result = tmp;
 		}
 	}
+	void deserialize(T)(Node value, string path, out T result) if (isSumType!T) {
+		static foreach (Type; T.Types) {
+			try {
+				Type tmp;
+				deserialize(value, path, tmp);
+				result = tmp;
+				return;
+			} catch (YAMLDException e) {}
+		}
+		throw new YAMLDException(value.startMark, "No matching types");
+	}
 	void deserialize(Node value, string path, out bool result) {
 		enforce(value.tag == `tag:yaml.org,2002:bool`, new YAMLDException(value.startMark, "Expecting a boolean value"));
 		result = value.get!bool;
@@ -149,7 +160,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			}
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T) {
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T) {
 		import std.exception : enforce;
 		import std.meta : AliasSeq;
 		import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
@@ -167,21 +178,33 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 				} else {
 					enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
 				}
-				alias fromFunc = getConvertFromFunc!(T, field);
-				try {
-					Parameters!(fromFunc)[0] param;
-					static if (hasUDA!(field, IgnoreErrors)) {
-						try {
+				static if (hasConvertToFunc!(T, field)) {
+					alias fromFunc = getConvertFromFunc!(T, field);
+					try {
+						Parameters!(fromFunc)[0] param;
+						static if (hasUDA!(field, IgnoreErrors)) {
+							try {
+								deserialize(value[memberName], newPath, param);
+								__traits(getMember, result, member) = fromFunc(param);
+							} catch (YAMLDException) {} //just skip it
+						} else {
 							deserialize(value[memberName], newPath, param);
 							__traits(getMember, result, member) = fromFunc(param);
-						} catch (YAMLDException) {} //just skip it
-					} else {
-						deserialize(value[memberName], newPath, param);
-						__traits(getMember, result, member) = fromFunc(param);
+						}
+					} catch (Exception e) {
+						e.msg = "Error deserializing "~newPath~": "~e.msg;
+						throw e;
 					}
-				} catch (Exception e) {
-					e.msg = "Error deserializing "~newPath~": "~e.msg;
-					throw e;
+				} else {
+					static if (hasUDA!(field, IgnoreErrors)) {
+						try {
+							deserialize(value[memberName], newPath, __traits(getMember, result, member));
+						} catch (YAMLDException) {
+							result = result.init;
+						}
+					} else {
+						deserialize(value[memberName], newPath, __traits(getMember, result, member));
+					}
 				}
 			}
 		}
@@ -238,33 +261,33 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	private Node serialize(const typeof(null) value) {
 		return Node(YAMLNull());
 	}
-	private Node serialize(const SysTime value) {
+	private Node serialize(ref const SysTime value) {
 		return Node(value.to!SysTime, "tag:yaml.org,2002:timestamp");
 	}
-	private Node serialize(const TimeOfDay value) {
+	private Node serialize(ref const TimeOfDay value) {
 		return Node(value.toISOExtString);
 	}
-	private Node serialize(T)(const T value) if (isSomeChar!T) {
+	private Node serialize(T)(auto ref const T value) if (isSomeChar!T) {
 		return serialize([value]);
 	}
-	private Node serialize(T)(const T value) if (canStoreUnchanged!T) {
+	private Node serialize(T)(auto ref const T value) if (canStoreUnchanged!T) {
 		return Node(value.to!T);
 	}
-	private Node serialize(T)(const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
+	private Node serialize(T)(auto ref const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
 		import std.utf : toUTF8;
 		return serialize(value[].toUTF8().idup);
 	}
-	private Node serialize(T)(const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private Node serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
 		return Node(value.text);
 	}
-	private Node serialize(T)(const T value) if (isAssociativeArray!T) {
+	private Node serialize(T)(auto ref const T value) if (isAssociativeArray!T) {
 		Node[Node] output;
 		foreach (k, v; value) {
 			output[serialize(k)] = serialize(v);
 		}
 		return Node(output);
 	}
-	private Node serialize(T)(T values) if (isSimpleList!T && !isSomeChar!(ElementType!T) && !isNullable!T) {
+	private Node serialize(T)(auto ref T values) if (isSimpleList!T && !isSomeChar!(ElementType!T) && !isNullable!T) {
 		Node[] output;
 		foreach (value; values) {
 			output ~= serialize(value);
@@ -274,9 +297,12 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	private Node serialize(T)(auto ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private Node serialize(T)(const T value) if (is(T == struct) && !hasSerializationMethod!T) {
+	private Node serialize(T)(auto ref const T value) if (is(T == struct) && !hasSerializationMethod!T) {
 		static if (is(T == Date) || is(T == DateTime)) {
 			return Node(value.toISOExtString, "tag:yaml.org,2002:timestamp");
+		} else static if (isSumType!T) {
+			import std.sumtype : match;
+			return value.match!(v => serialize(v));
 		} else static if (isNullable!T) {
 			if (value.isNull) {
 				return serialize(null);
@@ -288,7 +314,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 			Node output = Node(empty, empty);
 			foreach (member; FieldNameTuple!T) {
 				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-					if (__traits(getMember, value, member).isSkippableValue(flags)) {
+					if (__traits(getMember, value, member).isSkippableValue!flags) {
 						continue;
 					}
 					enum memberName = getMemberName!(__traits(getMember, T, member));

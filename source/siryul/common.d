@@ -3,6 +3,8 @@ import std.meta : templateAnd, templateNot, templateOr;
 import std.range : isInputRange, isOutputRange;
 import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isInstanceOf, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
 import std.typecons : BitFlags, Nullable, NullableRef;
+import std.sumtype : SumType;
+
 ///Serialization options
 enum Siryulize {
 	none, ///Default behaviour
@@ -61,6 +63,11 @@ package enum isNullable(T) = isInstanceOf!(Nullable, T);
 static assert(isNullable!(Nullable!int));
 static assert(isNullable!(Nullable!(int, 0)));
 static assert(!isNullable!int);
+
+package enum isSumType(T) = isInstanceOf!(SumType, T);
+static assert(isSumType!(SumType!int));
+static assert(isSumType!(SumType!(int, bool)));
+static assert(!isSumType!int);
 
 /++
  + (De)serialize field using a different name.
@@ -146,11 +153,9 @@ template hasConvertToFunc(T, alias member) {
 package template getConvertToFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		import std.meta : AliasSeq;
-		alias getConvertToFunc = AliasSeq!(__traits(getMember, T, getUDAs!(member, CustomParser)[0].toFunc))[0];
+		alias getConvertToFunc = __traits(getMember, T, getUDAs!(member, CustomParser)[0].toFunc);
 	} else static if (is(typeof(T.toSiryulHelper!(member.stringof)))) {
 		alias getConvertToFunc = T.toSiryulHelper!(member.stringof);
-	} else {
-		alias getConvertToFunc = (const(typeof(member)) v) { return v; };
 	}
 	static assert(arity!getConvertToFunc == 1, "Arity of conversion function must be exactly 1");
 }
@@ -180,9 +185,7 @@ version(unittest) {
 unittest {
 	import std.datetime : SysTime;
 	assert(getConvertToFunc!(TimeTest, TimeTest.time)(SysTime.min) == "this has nothing to do with time.");
-	assert(getConvertToFunc!(TimeTest, TimeTest.nothing)("test") == "test");
 	assert(getConvertToFunc!(TimeTest2, TimeTest2.time)(SysTime.min) == "this has nothing to do with time.");
-	assert(getConvertToFunc!(TimeTest2, TimeTest2.nothing)("test") == "test");
 }
 package template getConvertFromFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
@@ -190,17 +193,14 @@ package template getConvertFromFunc(T, alias member) {
 		alias getConvertFromFunc = AliasSeq!(__traits(getMember, T, getUDAs!(member, CustomParser)[0].fromFunc))[0];
 	} else static if (is(typeof(T.fromSiryulHelper!(member.stringof)))) {
 		alias getConvertFromFunc = T.fromSiryulHelper!(member.stringof);
-	} else {
-		alias getConvertFromFunc = (typeof(member) v) { return v; };
 	}
 	static assert(arity!getConvertFromFunc == 1, "Arity of conversion function must be exactly 1");
 }
 unittest {
 	import std.datetime : SysTime;
-	assert(getConvertFromFunc!(TimeTest, TimeTest.time)("yep") == SysTime.min);
-	assert(getConvertFromFunc!(TimeTest, TimeTest.nothing)("test") == "test");
-	assert(getConvertFromFunc!(TimeTest2, TimeTest2.time)("yep") == SysTime.min);
-	assert(getConvertFromFunc!(TimeTest2, TimeTest2.nothing)("test") == "test");
+	auto str1 = "yep";
+	assert(getConvertFromFunc!(TimeTest, TimeTest.time)(str1) == SysTime.min);
+	assert(getConvertFromFunc!(TimeTest2, TimeTest2.time)(str1) == SysTime.min);
 }
 
 template isStaticString(T) {
@@ -213,9 +213,10 @@ template isTimeType(T) {
 	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
 }
 
-bool isSkippableValue(T)(T value, BitFlags!Siryulize flags) @safe pure {
+bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @safe pure {
 	import std.traits : hasMember, isFloatingPoint;
-	if (flags.omitNulls) {
+	bool result = false;
+	static if (flags.omitNulls) {
 		static if (hasMember!(typeof(value), "isNull")) {
 			if (value.isNull) {
 				return true;
@@ -226,13 +227,20 @@ bool isSkippableValue(T)(T value, BitFlags!Siryulize flags) @safe pure {
 			}
 		}
 	}
-	if (flags.omitInits) {
+	static if (flags.omitInits) {
 		static if (is(typeof(T.init is null))) {
 			if (value is T.init) {
 				return true;
 			}
-		} else  static if (T.init == T.init) {
-			if (value == value.init) {
+		} else static if (isArray!T) {
+			foreach (const element; value) {
+				if (element != element.init) {
+					return false;
+				}
+			}
+			result = true;
+		} else static if (T.init == T.init) {
+			if (value == T.init) {
 				return true;
 			}
 		} else static if (isFloatingPoint!T) {
@@ -242,74 +250,94 @@ bool isSkippableValue(T)(T value, BitFlags!Siryulize flags) @safe pure {
 			}
 		}
 	}
-	return false;
+	return result;
 }
 
 @safe pure unittest {
-	auto skipInits = BitFlags!Siryulize(Siryulize.omitInits);
-	auto skipNulls = BitFlags!Siryulize(Siryulize.omitNulls);
-	auto skipNothing = BitFlags!Siryulize();
-	assert(isSkippableValue(Nullable!int(), skipInits));
-	assert(isSkippableValue(Nullable!int(), skipNulls));
-	assert(!isSkippableValue(Nullable!int(), skipNothing));
+	enum skipInits = BitFlags!Siryulize(Siryulize.omitInits);
+	enum skipNulls = BitFlags!Siryulize(Siryulize.omitNulls);
+	enum skipNothing = BitFlags!Siryulize();
+	const nint = Nullable!int();
+	assert(isSkippableValue!skipInits(nint));
+	assert(isSkippableValue!skipNulls(nint));
+	assert(!isSkippableValue!skipNothing(nint));
 
-	assert(isSkippableValue(Nullable!(int, 0)(), skipInits));
-	assert(isSkippableValue(Nullable!(int, 0)(), skipNulls));
-	assert(!isSkippableValue(Nullable!(int, 0)(), skipNothing));
+	const nint2 = Nullable!(int, 0)();
+	assert(isSkippableValue!skipInits(nint2));
+	assert(isSkippableValue!skipNulls(nint2));
+	assert(!isSkippableValue!skipNothing(nint2));
 
-	assert(isSkippableValue(Nullable!(int, 100)(), skipInits));
-	assert(isSkippableValue(Nullable!(int, 100)(), skipNulls));
-	assert(!isSkippableValue(Nullable!(int, 100)(), skipNothing));
+	const nint3 = Nullable!(int, 100)();
+	assert(isSkippableValue!skipInits(nint3));
+	assert(isSkippableValue!skipNulls(nint3));
+	assert(!isSkippableValue!skipNothing(nint3));
 
-	assert(isSkippableValue(0, skipInits));
-	assert(!isSkippableValue(0, skipNulls));
-	assert(!isSkippableValue(0, skipNothing));
+	const i = 0;
+	assert(isSkippableValue!skipInits(i));
+	assert(!isSkippableValue!skipNulls(i));
+	assert(!isSkippableValue!skipNothing(i));
 
-	assert(!isSkippableValue(1, skipInits));
-	assert(!isSkippableValue(1, skipNulls));
-	assert(!isSkippableValue(1, skipNothing));
+	const i2 = 1;
+	assert(!isSkippableValue!skipInits(i2));
+	assert(!isSkippableValue!skipNulls(i2));
+	assert(!isSkippableValue!skipNothing(i2));
 
-	assert(isSkippableValue([], skipInits));
-	assert(isSkippableValue([], skipNulls));
-	assert(!isSkippableValue([], skipNothing));
+	const a = [];
+	assert(isSkippableValue!skipInits(a));
+	assert(isSkippableValue!skipNulls(a));
+	assert(!isSkippableValue!skipNothing(a));
 
-	assert(!isSkippableValue([1], skipInits));
-	assert(!isSkippableValue([1], skipNulls));
-	assert(!isSkippableValue([1], skipNothing));
+	const a2 = [1];
+	assert(!isSkippableValue!skipInits(a2));
+	assert(!isSkippableValue!skipNulls(a2));
+	assert(!isSkippableValue!skipNothing(a2));
 
-	assert(isSkippableValue((string[string]).init, skipInits));
-	assert(isSkippableValue((string[string]).init, skipNulls));
-	assert(!isSkippableValue((string[string]).init, skipNothing));
+	const int[1] a3;
+	assert(isSkippableValue!skipInits(a3));
+	assert(!isSkippableValue!skipNulls(a3));
+	assert(!isSkippableValue!skipNothing(a3));
 
-	assert(!isSkippableValue([1:1], skipInits));
-	assert(!isSkippableValue([1:1], skipNulls));
-	assert(!isSkippableValue([1:1], skipNothing));
+	const string[string] aa;
+	assert(isSkippableValue!skipInits(aa));
+	assert(isSkippableValue!skipNulls(aa));
+	assert(!isSkippableValue!skipNothing(aa));
 
-	assert(isSkippableValue((int*).init, skipInits));
-	assert(isSkippableValue((int*).init, skipNulls));
-	assert(!isSkippableValue((int*).init, skipNothing));
+	const aa2 = [1:1];
+	assert(!isSkippableValue!skipInits(aa2));
+	assert(!isSkippableValue!skipNulls(aa2));
+	assert(!isSkippableValue!skipNothing(aa2));
+
+	const int* p;
+	assert(isSkippableValue!skipInits(p));
+	assert(isSkippableValue!skipNulls(p));
+	assert(!isSkippableValue!skipNothing(p));
 
 	class X {}
-	assert(isSkippableValue(X.init, skipInits));
-	assert(isSkippableValue(X.init, skipNulls));
-	assert(!isSkippableValue(X.init, skipNothing));
+	const X x;
+	assert(isSkippableValue!skipInits(x));
+	assert(isSkippableValue!skipNulls(x));
+	assert(!isSkippableValue!skipNothing(x));
 
 	struct Y {
 		int a;
 	}
-	assert(isSkippableValue(Y.init, skipInits));
-	assert(!isSkippableValue(Y.init, skipNulls));
-	assert(!isSkippableValue(Y.init, skipNothing));
+	const Y y;
+	assert(isSkippableValue!skipInits(y));
+	assert(!isSkippableValue!skipNulls(y));
+	assert(!isSkippableValue!skipNothing(y));
 
-	assert(!isSkippableValue(Y(1), skipInits));
-	assert(!isSkippableValue(Y(1), skipNulls));
-	assert(!isSkippableValue(Y(1), skipNothing));
+	const y2 =Y(1);
+	assert(!isSkippableValue!skipInits(y2));
+	assert(!isSkippableValue!skipNulls(y2));
+	assert(!isSkippableValue!skipNothing(y2));
 
-	assert(isSkippableValue(double.init, skipInits));
-	assert(!isSkippableValue(double.init, skipNulls));
-	assert(!isSkippableValue(double.init, skipNothing));
+	const double f;
+	assert(isSkippableValue!skipInits(f));
+	assert(!isSkippableValue!skipNulls(f));
+	assert(!isSkippableValue!skipNothing(f));
 
-	assert(!isSkippableValue(2.0, skipInits));
-	assert(!isSkippableValue(2.0, skipNulls));
-	assert(!isSkippableValue(2.0, skipNothing));
+	const f2 = 2.0;
+	assert(!isSkippableValue!skipInits(f2));
+	assert(!isSkippableValue!skipNulls(f2));
+	assert(!isSkippableValue!skipNothing(f2));
 }

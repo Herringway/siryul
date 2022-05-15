@@ -59,6 +59,17 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 			result = tmp;
 		}
 	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isSumType!T) {
+		static foreach (Type; T.Types) {
+			try {
+				Type tmp;
+				deserialize(value, path, tmp);
+				result = tmp;
+				return;
+			} catch (JSONDException e) {}
+		}
+		throw new JSONDException("No matching types");
+	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isFloatingPoint!T) {
 		import std.conv : to;
 		expect(value, JSONType.float_, JSONType.integer, JSONType.string);
@@ -87,7 +98,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		result = new P;
 		deserialize(value, path, *result);
 	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T && !hasDeserializationMethod!T) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T) {
 		static if (isTimeType!T) {
 			string dateString;
 			deserialize(value, path, dateString);
@@ -110,21 +121,33 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 					} else {
 						enforce!JSONDException(memberName in value.objectNoRef, "Missing non-@Optional "~memberName~" in node");
 					}
-					alias fromFunc = getConvertFromFunc!(T, field);
-					try {
-						Parameters!(fromFunc)[0] param;
-						static if (hasUDA!(field, IgnoreErrors)) {
-							try {
+					static if (hasConvertToFunc!(T, field)) {
+						alias fromFunc = getConvertFromFunc!(T, field);
+						try {
+							Parameters!(fromFunc)[0] param;
+							static if (hasUDA!(field, IgnoreErrors)) {
+								try {
+									deserialize(value[memberName], newPath, param);
+									__traits(getMember, result, member) = fromFunc(param);
+								} catch (UnexpectedTypeException) {} //just skip it
+							} else {
 								deserialize(value[memberName], newPath, param);
 								__traits(getMember, result, member) = fromFunc(param);
-							} catch (UnexpectedTypeException) {} //just skip it
-						} else {
-							deserialize(value[memberName], newPath, param);
-							__traits(getMember, result, member) = fromFunc(param);
+							}
+						} catch (Exception e) {
+							e.msg = "Error deserializing "~newPath~": "~e.msg;
+							throw e;
 						}
-					} catch (Exception e) {
-						e.msg = "Error deserializing "~newPath~": "~e.msg;
-						throw e;
+					} else {
+						static if (hasUDA!(field, IgnoreErrors)) {
+							try {
+								deserialize(value[memberName], newPath, __traits(getMember, result, member));
+							} catch (UnexpectedTypeException) {
+								result = result.init;
+							}
+						} else {
+							deserialize(value[memberName], newPath, __traits(getMember, result, member));
+						}
 					}
 				}
 			}
@@ -204,53 +227,61 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 }
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
-	import std.traits : hasUDA, isAggregateType;
-	private JSONValue serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T) {
+	import std.traits : hasUDA, isAggregateType, Unqual;
+	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T) {
 		import std.traits : FieldNameTuple;
 		string[string] arr;
 		auto output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
 			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-				if (__traits(getMember, value, member).isSkippableValue(flags)) {
+				if (__traits(getMember, value, member).isSkippableValue!flags) {
 					continue;
 				}
 				enum memberName = getMemberName!(__traits(getMember, T, member));
-				output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
+				static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
+					output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
+				} else {
+					output.object[memberName] = serialize(__traits(getMember, value, member));
+				}
 			}
 		}
 		return output;
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (isNullable!T) {
+	private JSONValue serialize(T)(ref const T value) if (isNullable!T) {
 		if (value.isNull) {
 			return serialize(null);
 		} else {
 			return serialize(value.get);
 		}
 	}
+	private JSONValue serialize(T)(ref const T value) if (isSumType!T) {
+		import std.sumtype : match;
+		return value.match!(v => serialize(v));
+	}
 	private JSONValue serialize(const typeof(null) value) {
 		return JSONValue();
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private JSONValue serialize(T)(ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
 		import std.conv : text;
 		return JSONValue(value.text);
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (isPointer!T) {
+	private JSONValue serialize(T)(ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (isTimeType!T) {
+	private JSONValue serialize(T)(ref const T value) if (isTimeType!T) {
 		return JSONValue(value.toISOExtString());
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (isSomeChar!T) {
+	private JSONValue serialize(T)(ref const T value) if (isSomeChar!T) {
 		return JSONValue([value]);
 	}
-	private JSONValue serialize(T)(auto ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
+	private JSONValue serialize(T)(ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
 		import std.utf : toUTF8;
 		return JSONValue(value[].toUTF8);
 	}
-	private JSONValue serialize(T)(auto ref const T value) if (canStoreUnchanged!T && !is(T == enum)) {
+	private JSONValue serialize(T)(const T value) if (canStoreUnchanged!(Unqual!T) && !is(T == enum)) {
 		return JSONValue(value);
 	}
-	private JSONValue serialize(T)(auto ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
+	private JSONValue serialize(T)(ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
 		string[] arr;
 		auto output = JSONValue(arr);
 		foreach (value; values) {
@@ -258,7 +289,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		}
 		return output;
 	}
-	private JSONValue serialize(T)(auto ref T values) if (isAssociativeArray!T) {
+	private JSONValue serialize(T)(ref T values) if (isAssociativeArray!T) {
 		string[string] arr;
 		auto output = JSONValue(arr);
 		foreach (key, value; values) {
@@ -266,7 +297,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		}
 		return output;
 	}
-	private JSONValue serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
+	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
 	}
 }
