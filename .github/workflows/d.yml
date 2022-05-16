@@ -32,6 +32,7 @@ jobs:
         compiler: dmd-latest
     - name: 'Install dependencies'
       run: |
+          sudo apt-get update
           sudo apt-get install libcurl4-openssl-dev
     - name: 'Test (with coverage)'
       env:
