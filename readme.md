@@ -1,5 +1,5 @@
 # Siryul - Serialization made simple
-[![Coverage Status](https://coveralls.io/repos/Herringway/siryul/badge.svg?branch=master&service=github)](https://coveralls.io/github/Herringway/siryul?branch=master)
+[![Coverage Status](https://coveralls.io/repos/Herringway/siryul/badge.svg?branch=main&service=github)](https://coveralls.io/github/Herringway/siryul?branch=main)
 ## Supported formats
 * YAML
 * JSON
