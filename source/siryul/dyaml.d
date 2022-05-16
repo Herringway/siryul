@@ -149,7 +149,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			}
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T) {
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
 		static if (hasDeserializationMethod!T) {
 			Parameters!(deserializationMethod!T) tmp;
 			deserialize(value, path, tmp);

@@ -86,7 +86,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		result = new P;
 		deserialize(value, path, *result);
 	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T) {
 		static if (hasDeserializationMethod!T) {
 			Parameters!(deserializationMethod!T) tmp;
 			deserialize(value, path, tmp);
