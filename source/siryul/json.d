@@ -29,6 +29,7 @@ private void expect(T...)(JSONValue node, T types, string file = __FILE__, ulong
 	enforce(node.type.among(types), new UnexpectedTypeException([types], node.type, file, line));
 }
 template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
+	import std.traits : isAggregateType;
 	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == enum)) {
 		import std.conv : to;
 		import std.traits : OriginalType;
@@ -86,12 +87,8 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		result = new P;
 		deserialize(value, path, *result);
 	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T) {
-		static if (hasDeserializationMethod!T) {
-			Parameters!(deserializationMethod!T) tmp;
-			deserialize(value, path, tmp);
-			result = deserializationMethod!T(tmp);
-		} else static if (isTimeType!T) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isNullable!T && !hasDeserializationMethod!T) {
+		static if (isTimeType!T) {
 			string dateString;
 			deserialize(value, path, dateString);
 			result = T.fromISOExtString(dateString);
@@ -199,36 +196,37 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		}
 	}
 	void deserialize(JSONValue, string, out typeof(null)) {}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isAggregateType!T && hasDeserializationMethod!T) {
+		Parameters!(deserializationMethod!T) tmp;
+		deserialize(value, path, tmp);
+		result = deserializationMethod!T(tmp);
+	}
 }
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
-	import std.traits : hasUDA;
-	private JSONValue serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
-		static if (hasSerializationMethod!T) {
-			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
-		} else {
-			import std.traits : FieldNameTuple;
-			string[string] arr;
-			auto output = JSONValue(arr);
-			foreach (member; FieldNameTuple!T) {
-				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-					static if (!!(flags & Siryulize.omitInits)) {
-						static if (isNullable!(typeof(__traits(getMember, T, member)))) {
-							if (__traits(getMember, value, member).isNull) {
-								continue;
-							}
-						} else {
-							if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
-								continue;
-							}
+	import std.traits : hasUDA, isAggregateType;
+	private JSONValue serialize(T)(auto ref const T value) if (is(T == struct) && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T) {
+		import std.traits : FieldNameTuple;
+		string[string] arr;
+		auto output = JSONValue(arr);
+		foreach (member; FieldNameTuple!T) {
+			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+				static if (!!(flags & Siryulize.omitInits)) {
+					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
+						if (__traits(getMember, value, member).isNull) {
+							continue;
+						}
+					} else {
+						if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
+							continue;
 						}
 					}
-					enum memberName = getMemberName!(__traits(getMember, T, member));
-					output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
 				}
+				enum memberName = getMemberName!(__traits(getMember, T, member));
+				output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
 			}
-			return output;
 		}
+		return output;
 	}
 	private JSONValue serialize(T)(auto ref const T value) if (isNullable!T) {
 		if (value.isNull) {
@@ -275,6 +273,9 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 			output.object[key] = serialize(value);
 		}
 		return output;
+	}
+	private JSONValue serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
+		return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
 	}
 }
 private template canStoreUnchanged(T) {

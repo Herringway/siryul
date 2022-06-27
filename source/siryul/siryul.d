@@ -505,6 +505,34 @@ version(unittest) {
 		}
 	}
 	runTest2(CustomSerializer(true), false);
+	static union SerializableUnion {
+		bool x;
+		int _ignored;
+		@SerializationMethod
+		bool serialize() const @safe {
+			return !x;
+		}
+		@DeserializationMethod
+		static auto deserialize(bool input) @safe {
+			return SerializableUnion(!input);
+		}
+	}
+	runTest2(SerializableUnion(true), false);
+	static class SerializableClass {
+		bool x;
+		this(bool input) @safe {
+			x = input;
+		}
+		@SerializationMethod
+		bool serialize() const @safe {
+			return !x;
+		}
+		@DeserializationMethod
+		static auto deserialize(bool input) @safe {
+			return new SerializableClass(!input);
+		}
+	}
+	runTest2(new SerializableClass(true), false);
 
 	static struct RequiredTest {
 		@Required bool x;

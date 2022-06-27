@@ -78,7 +78,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
 	import std.range : enumerate, isOutputRange, put;
-	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAggregateType, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
 		import std.conv : to;
@@ -149,46 +149,39 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			}
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T) {
-		static if (hasDeserializationMethod!T) {
-			Parameters!(deserializationMethod!T) tmp;
-			deserialize(value, path, tmp);
-			result = deserializationMethod!T(tmp);
-			return;
-		} else {
-			import std.exception : enforce;
-			import std.meta : AliasSeq;
-			import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-			expect(value, NodeID.mapping);
-			foreach (member; FieldNameTuple!T) {
-				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-					debug string newPath = path~"."~member;
-					else string newPath = path;
-					alias field = AliasSeq!(__traits(getMember, T, member));
-					enum memberName = getMemberName!field;
-					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
-						if (memberName !in value) {
-							continue;
-						}
-					} else {
-						enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T) {
+		import std.exception : enforce;
+		import std.meta : AliasSeq;
+		import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+		expect(value, NodeID.mapping);
+		foreach (member; FieldNameTuple!T) {
+			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+				debug string newPath = path~"."~member;
+				else string newPath = path;
+				alias field = AliasSeq!(__traits(getMember, T, member));
+				enum memberName = getMemberName!field;
+				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
+					if (memberName !in value) {
+						continue;
 					}
-					alias fromFunc = getConvertFromFunc!(T, field);
-					try {
-						Parameters!(fromFunc)[0] param;
-						static if (hasUDA!(field, IgnoreErrors)) {
-							try {
-								deserialize(value[memberName], newPath, param);
-								__traits(getMember, result, member) = fromFunc(param);
-							} catch (YAMLDException) {} //just skip it
-						} else {
+				} else {
+					enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
+				}
+				alias fromFunc = getConvertFromFunc!(T, field);
+				try {
+					Parameters!(fromFunc)[0] param;
+					static if (hasUDA!(field, IgnoreErrors)) {
+						try {
 							deserialize(value[memberName], newPath, param);
 							__traits(getMember, result, member) = fromFunc(param);
-						}
-					} catch (Exception e) {
-						e.msg = "Error deserializing "~newPath~": "~e.msg;
-						throw e;
+						} catch (YAMLDException) {} //just skip it
+					} else {
+						deserialize(value[memberName], newPath, param);
+						__traits(getMember, result, member) = fromFunc(param);
 					}
+				} catch (Exception e) {
+					e.msg = "Error deserializing "~newPath~": "~e.msg;
+					throw e;
 				}
 			}
 		}
@@ -232,11 +225,16 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		deserialize(value, path, *result);
 	}
 	void deserialize(Node, string, out typeof(null)) {}
+	void deserialize(T)(Node value, string path, out T result) if (isAggregateType!T && hasDeserializationMethod!T) {
+		Parameters!(deserializationMethod!T) tmp;
+		deserialize(value, path, tmp);
+		result = deserializationMethod!T(tmp);
+	}
 }
 template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
+	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAggregateType, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
 	private Node serialize(const typeof(null) value) {
 		return Node(YAMLNull());
 	}
@@ -276,10 +274,8 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	private Node serialize(T)(auto ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private Node serialize(T)(const T value) if (is(T == struct)) {
-		static if (hasSerializationMethod!T) {
-			return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
-		} else static if (is(T == Date) || is(T == DateTime)) {
+	private Node serialize(T)(const T value) if (is(T == struct) && !hasSerializationMethod!T) {
+		static if (is(T == Date) || is(T == DateTime)) {
 			return Node(value.toISOExtString, "tag:yaml.org,2002:timestamp");
 		} else static if (isNullable!T) {
 			if (value.isNull) {
@@ -323,6 +319,9 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 			}
 			return output;
 		}
+	}
+	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
+		return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
 	}
 }
 private template expectedTag(T) {
