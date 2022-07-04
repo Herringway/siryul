@@ -269,6 +269,22 @@ bool isSkippableValue(T)(T value, BitFlags!Siryulize flags) @safe pure {
 	assert(!isSkippableValue(1, skipNulls));
 	assert(!isSkippableValue(1, skipNothing));
 
+	assert(isSkippableValue([], skipInits));
+	assert(isSkippableValue([], skipNulls));
+	assert(!isSkippableValue([], skipNothing));
+
+	assert(!isSkippableValue([1], skipInits));
+	assert(!isSkippableValue([1], skipNulls));
+	assert(!isSkippableValue([1], skipNothing));
+
+	assert(isSkippableValue((string[string]).init, skipInits));
+	assert(isSkippableValue((string[string]).init, skipNulls));
+	assert(!isSkippableValue((string[string]).init, skipNothing));
+
+	assert(!isSkippableValue([1:1], skipInits));
+	assert(!isSkippableValue([1:1], skipNulls));
+	assert(!isSkippableValue([1:1], skipNothing));
+
 	assert(isSkippableValue((int*).init, skipInits));
 	assert(isSkippableValue((int*).init, skipNulls));
 	assert(!isSkippableValue((int*).init, skipNothing));
