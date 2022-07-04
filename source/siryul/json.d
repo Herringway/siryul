@@ -211,16 +211,8 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		auto output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
 			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-				static if (!!(flags & Siryulize.omitInits)) {
-					static if (isNullable!(typeof(__traits(getMember, T, member)))) {
-						if (__traits(getMember, value, member).isNull) {
-							continue;
-						}
-					} else {
-						if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
-							continue;
-						}
-					}
+				if (__traits(getMember, value, member).isSkippableValue(flags)) {
+					continue;
 				}
 				enum memberName = getMemberName!(__traits(getMember, T, member));
 				output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));

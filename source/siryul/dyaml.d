@@ -288,23 +288,11 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 			Node output = Node(empty, empty);
 			foreach (member; FieldNameTuple!T) {
 				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
-					static if (!!(flags & Siryulize.omitInits)) {
-						static if (isNullable!(typeof(__traits(getMember, value, member)))) {
-							if (__traits(getMember, value, member).isNull)
-								continue;
-						} else {
-							if (__traits(getMember, value, member) == __traits(getMember, value, member).init) {
-								continue;
-							}
-						}
+					if (__traits(getMember, value, member).isSkippableValue(flags)) {
+						continue;
 					}
 					enum memberName = getMemberName!(__traits(getMember, T, member));
 					try {
-						static if (isPointer!(typeof(mixin("value."~member))) && !!(flags & Siryulize.omitNulls)) {
-							if (mixin("value."~member) is null) {
-								continue;
-							}
-						}
 						static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
 							auto val = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
 							output.add(memberName, val);

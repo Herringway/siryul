@@ -212,3 +212,88 @@ template isTimeType(T) {
 	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
 	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
 }
+
+bool isSkippableValue(T)(T value, BitFlags!Siryulize flags) @safe pure {
+	import std.traits : hasMember, isFloatingPoint;
+	if (flags.omitNulls) {
+		static if (hasMember!(typeof(value), "isNull")) {
+			if (value.isNull) {
+				return true;
+			}
+		} else static if (is(typeof(value is null))) {
+			if (value is null) {
+				return true;
+			}
+		}
+	}
+	if (flags.omitInits) {
+		static if (is(typeof(T.init is null))) {
+			if (value is T.init) {
+				return true;
+			}
+		} else  static if (T.init == T.init) {
+			if (value == value.init) {
+				return true;
+			}
+		} else static if (isFloatingPoint!T) {
+			import std.math.traits : isNaN;
+			if (value.isNaN) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+@safe pure unittest {
+	auto skipInits = BitFlags!Siryulize(Siryulize.omitInits);
+	auto skipNulls = BitFlags!Siryulize(Siryulize.omitNulls);
+	auto skipNothing = BitFlags!Siryulize();
+	assert(isSkippableValue(Nullable!int(), skipInits));
+	assert(isSkippableValue(Nullable!int(), skipNulls));
+	assert(!isSkippableValue(Nullable!int(), skipNothing));
+
+	assert(isSkippableValue(Nullable!(int, 0)(), skipInits));
+	assert(isSkippableValue(Nullable!(int, 0)(), skipNulls));
+	assert(!isSkippableValue(Nullable!(int, 0)(), skipNothing));
+
+	assert(isSkippableValue(Nullable!(int, 100)(), skipInits));
+	assert(isSkippableValue(Nullable!(int, 100)(), skipNulls));
+	assert(!isSkippableValue(Nullable!(int, 100)(), skipNothing));
+
+	assert(isSkippableValue(0, skipInits));
+	assert(!isSkippableValue(0, skipNulls));
+	assert(!isSkippableValue(0, skipNothing));
+
+	assert(!isSkippableValue(1, skipInits));
+	assert(!isSkippableValue(1, skipNulls));
+	assert(!isSkippableValue(1, skipNothing));
+
+	assert(isSkippableValue((int*).init, skipInits));
+	assert(isSkippableValue((int*).init, skipNulls));
+	assert(!isSkippableValue((int*).init, skipNothing));
+
+	class X {}
+	assert(isSkippableValue(X.init, skipInits));
+	assert(isSkippableValue(X.init, skipNulls));
+	assert(!isSkippableValue(X.init, skipNothing));
+
+	struct Y {
+		int a;
+	}
+	assert(isSkippableValue(Y.init, skipInits));
+	assert(!isSkippableValue(Y.init, skipNulls));
+	assert(!isSkippableValue(Y.init, skipNothing));
+
+	assert(!isSkippableValue(Y(1), skipInits));
+	assert(!isSkippableValue(Y(1), skipNulls));
+	assert(!isSkippableValue(Y(1), skipNothing));
+
+	assert(isSkippableValue(double.init, skipInits));
+	assert(!isSkippableValue(double.init, skipNulls));
+	assert(!isSkippableValue(double.init, skipNothing));
+
+	assert(!isSkippableValue(2.0, skipInits));
+	assert(!isSkippableValue(2.0, skipNulls));
+	assert(!isSkippableValue(2.0, skipNothing));
+}
