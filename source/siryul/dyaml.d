@@ -294,10 +294,10 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 					enum memberName = getMemberName!(__traits(getMember, T, member));
 					try {
 						static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
-							auto val = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
+							auto val = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
 							output.add(memberName, val);
 						} else {
-							output.add(memberName, serialize(mixin("value."~member)));
+							output.add(memberName, serialize(__traits(getMember, value, member)));
 						}
 					} catch (Exception e) {
 						e.msg = "Error serializing: "~e.msg;
@@ -309,7 +309,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 		}
 	}
 	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
-		return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
+		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
 	}
 }
 private template expectedTag(T) {

@@ -215,7 +215,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 					continue;
 				}
 				enum memberName = getMemberName!(__traits(getMember, T, member));
-				output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(mixin("value."~member)));
+				output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
 			}
 		}
 		return output;
@@ -267,7 +267,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		return output;
 	}
 	private JSONValue serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
-		return serialize(mixin("value."~__traits(identifier, serializationMethod!T)));
+		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
 	}
 }
 private template canStoreUnchanged(T) {
