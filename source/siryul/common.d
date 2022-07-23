@@ -106,8 +106,6 @@ struct CustomParser {
 enum AsString;
 ///Write field as binary (NYI)
 enum AsBinary;
-///Errors are ignored; value will be .init
-enum IgnoreErrors;
 ///Marks a method for use in serialization
 enum SerializationMethod;
 ///Marks a method for use in deserialization

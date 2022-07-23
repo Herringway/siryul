@@ -480,16 +480,6 @@ version(unittest) {
 
 	runTest(PrivateTest(0,true));
 
-	struct IgnoreErrBad {
-		float n = 1.2;
-	}
-	struct IgnoreErrGood {
-		@IgnoreErrors int n = 5;
-	}
-	foreach (siryulizer; siryulizers) {
-		assert(IgnoreErrBad().toString!siryulizer.fromString!(IgnoreErrGood, siryulizer).n == IgnoreErrGood.init.n, "IgnoreErrors test failed for "~siryulizer.stringof);
-	}
-
 	struct StructPtr {
 		ubyte[100] bytes;
 	}

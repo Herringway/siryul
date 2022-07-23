@@ -182,29 +182,14 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 					alias fromFunc = getConvertFromFunc!(T, field);
 					try {
 						Parameters!(fromFunc)[0] param;
-						static if (hasUDA!(field, IgnoreErrors)) {
-							try {
-								deserialize(value[memberName], newPath, param);
-								__traits(getMember, result, member) = fromFunc(param);
-							} catch (YAMLDException) {} //just skip it
-						} else {
-							deserialize(value[memberName], newPath, param);
-							__traits(getMember, result, member) = fromFunc(param);
-						}
+						deserialize(value[memberName], newPath, param);
+						__traits(getMember, result, member) = fromFunc(param);
 					} catch (Exception e) {
 						e.msg = "Error deserializing "~newPath~": "~e.msg;
 						throw e;
 					}
 				} else {
-					static if (hasUDA!(field, IgnoreErrors)) {
-						try {
-							deserialize(value[memberName], newPath, __traits(getMember, result, member));
-						} catch (YAMLDException) {
-							result = result.init;
-						}
-					} else {
-						deserialize(value[memberName], newPath, __traits(getMember, result, member));
-					}
+					deserialize(value[memberName], newPath, __traits(getMember, result, member));
 				}
 			}
 		}
