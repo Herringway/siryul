@@ -238,7 +238,7 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 			}
 			result = true;
 		} else static if (T.init == T.init) {
-			if (value == T.init) {
+			if (value == const(T).init) {
 				return true;
 			}
 		} else static if (isFloatingPoint!T) {
@@ -304,6 +304,12 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 	assert(!isSkippableValue!skipInits(aa2));
 	assert(!isSkippableValue!skipNulls(aa2));
 	assert(!isSkippableValue!skipNothing(aa2));
+
+	static struct AssocWrapped { int[int] a; }
+	AssocWrapped aa3; // https://issues.dlang.org/show_bug.cgi?id=13622
+	assert(isSkippableValue!skipInits(aa3));
+	assert(!isSkippableValue!skipNulls(aa3));
+	assert(!isSkippableValue!skipNothing(aa3));
 
 	const int* p;
 	assert(isSkippableValue!skipInits(p));
