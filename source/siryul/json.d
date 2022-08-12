@@ -205,6 +205,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	}
 	void deserialize(JSONValue, string, out typeof(null)) {}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isAggregateType!T && hasDeserializationMethod!T) {
+		import std.traits : Parameters;
 		Parameters!(deserializationMethod!T) tmp;
 		deserialize(value, path, tmp);
 		result = deserializationMethod!T(tmp);

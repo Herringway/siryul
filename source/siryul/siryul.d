@@ -499,6 +499,8 @@ version(unittest) {
 		}
 	}
 	runTest2(CustomSerializer(true), false);
+	runTest2(false, CustomSerializer(true));
+
 	static union SerializableUnion {
 		bool x;
 		int _ignored;
@@ -512,6 +514,8 @@ version(unittest) {
 		}
 	}
 	runTest2(SerializableUnion(true), false);
+	runTest2(false, SerializableUnion(true));
+
 	static class SerializableClass {
 		bool x;
 		this(bool input) @safe {
@@ -525,8 +529,12 @@ version(unittest) {
 		static auto deserialize(bool input) @safe {
 			return new SerializableClass(!input);
 		}
+		bool opEquals(const SerializableClass rhs) {
+			return x == rhs.x;
+		}
 	}
 	runTest2(new SerializableClass(true), false);
+	runTest2(false, new SerializableClass(true));
 
 	static struct RequiredTest {
 		@Required bool x;
