@@ -289,8 +289,7 @@ version(unittest) {
 		double h;
 		char i;
 	}
-	alias SkipImmutable = Flag!"SkipImmutable";
-	void runTest2(SkipImmutable flag = SkipImmutable.no, T, U)(auto ref T input, auto ref U expected) {
+	void runTest2(T, U)(auto ref T input, auto ref U expected) {
 		import std.traits : isPointer;
 		foreach (siryulizer; siryulizers) {
 			assert(isSiryulizer!siryulizer);
@@ -365,7 +364,7 @@ version(unittest) {
 	runTest(DateTime(2000, 1, 1, 1, 1, 1));
 	runTest(SysTime(DateTime(2000, 1, 1), UTC()));
 
-	runTest2!(SkipImmutable.yes)([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
+	runTest2([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
 
 	runTest2(3, TestEnum.wont);
@@ -414,8 +413,8 @@ version(unittest) {
 	}
 
 	runTest2Fail!bool("b");
-	runTest2!(SkipImmutable.yes)(Nullable!string.init, wstring.init);
-	runTest2!(SkipImmutable.yes)(Nullable!char.init, wchar.init);
+	runTest2(Nullable!string.init, wstring.init);
+	runTest2(Nullable!char.init, wchar.init);
 
 	//Autoconversion tests
 	//string <-> int
