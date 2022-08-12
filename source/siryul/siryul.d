@@ -237,32 +237,16 @@ version(unittest) {
 		Nullable!(uint,0) anotherNullable;
 		Nullable!SysTime noDate;
 		Nullable!TestEnum noEnum;
-		void toString(scope void delegate(const(char)[]) @safe sink) @safe const {
+		void toString(W)(ref W sink) @safe const {
 			import std.format : formattedWrite;
 			sink("TestNull(");
 			formattedWrite(sink, "%s, ", notNull);
 			formattedWrite(sink, "%s, ", aString);
 			formattedWrite(sink, "%s, ", emptyArray);
-			if (aNullable.isNull) {
-				sink("null, ");
-			} else {
-				formattedWrite(sink, "%s, ", aNullable.get);
-			}
-			if (anotherNullable.isNull) {
-				sink("null, ");
-			} else {
-				formattedWrite(sink, "%s, ", anotherNullable.get);
-			}
-			if (noDate.isNull) {
-				sink("null, ");
-			} else {
-				formattedWrite(sink, "%s, ", noDate.get);
-			}
-			if (noEnum.isNull) {
-				sink("null, ");
-			} else {
-				formattedWrite(sink, "%s, ", noEnum.get);
-			}
+			formattedWrite(sink, "%s, ", aNullable);
+			formattedWrite(sink, "%s, ", anotherNullable);
+			formattedWrite(sink, "%s, ", noDate);
+			formattedWrite(sink, "%s, ", noEnum);
 			sink(")");
 		}
 	}
