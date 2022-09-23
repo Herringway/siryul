@@ -311,8 +311,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 							output.add(memberName, serialize(__traits(getMember, value, member)));
 						}
 					} catch (Exception e) {
-						e.msg = "Error serializing: "~e.msg;
-						throw e;
+						throw new YAMLSException("Error serializing: "~e.msg, e.file, e.line);
 					}
 				}
 			}
