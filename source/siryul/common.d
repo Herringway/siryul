@@ -185,6 +185,15 @@ unittest {
 	assert(getConvertToFunc!(TimeTest, TimeTest.time)(SysTime.min) == "this has nothing to do with time.");
 	assert(getConvertToFunc!(TimeTest2, TimeTest2.time)(SysTime.min) == "this has nothing to do with time.");
 }
+template hasConvertFromFunc(T, alias member) {
+	static if (hasUDA!(member, CustomParser)) {
+		enum hasConvertFromFunc = true;
+	} else static if (is(typeof(T.fromSiryulHelper!(member.stringof)))) {
+		enum hasConvertFromFunc = true;
+	} else {
+		enum hasConvertFromFunc = false;
+	}
+}
 package template getConvertFromFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		import std.meta : AliasSeq;

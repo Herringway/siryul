@@ -171,18 +171,21 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 				else string newPath = path;
 				alias field = AliasSeq!(__traits(getMember, T, member));
 				enum memberName = getMemberName!field;
+				const valueIsAbsent = memberName !in value;
 				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
-					if (memberName !in value) {
+					if (!hasConvertFromFunc!(T, field) && valueIsAbsent) {
 						continue;
 					}
 				} else {
 					enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
 				}
-				static if (hasConvertToFunc!(T, field)) {
+				static if (hasConvertFromFunc!(T, field)) {
 					alias fromFunc = getConvertFromFunc!(T, field);
 					try {
 						Parameters!(fromFunc)[0] param;
-						deserialize(value[memberName], newPath, param);
+						if (!valueIsAbsent) {
+							deserialize(value[memberName], newPath, param);
+						}
 						__traits(getMember, result, member) = fromFunc(param);
 					} catch (Exception e) {
 						e.msg = "Error deserializing "~newPath~": "~e.msg;

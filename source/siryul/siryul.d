@@ -485,6 +485,21 @@ version(unittest) {
 	runTest2(CustomSerializer(true), false);
 	runTest2(false, CustomSerializer(true));
 
+	static struct CustomSerializer2 {
+		bool x;
+		static auto toSiryulHelper(string T)(bool v) if(T == "x") {
+			return !v;
+		}
+		static auto fromSiryulHelper(string T)(bool v) if (T == "x") {
+			return !v;
+		}
+	}
+	static struct SimpleWrapper {
+		bool x;
+	}
+	runTest2(CustomSerializer2(true), SimpleWrapper(false));
+	runTest2(SimpleWrapper(false), CustomSerializer2(true));
+
 	static union SerializableUnion {
 		bool x;
 		int _ignored;
