@@ -283,13 +283,13 @@ version(unittest) {
 			}
 			debug(verbosetesting) {
 				writeln("-----");
-				static if (isPointer!T) {
+				static if (isPointer!T && isCopyable!(typeof(*input))) {
 					writeln("Input:\n ", *input);
 				} else {
 					writeln("Input:\n ", input);
 				}
 				writeln("Serialized:\n", input.toFormattedString!siryulizer);
-				static if (isPointer!T) {
+				static if (isPointer!T && isCopyable!(typeof(*input))) {
 					writeln("Output:\n ", *gotYAMLValue);
 				} else {
 					writeln("Output:\n ", gotYAMLValue);
