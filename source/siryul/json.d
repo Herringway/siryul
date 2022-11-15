@@ -64,7 +64,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 			try {
 				Type tmp;
 				deserialize(value, path, tmp);
-				result = tmp;
+				trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
 				return;
 			} catch (JSONDException e) {}
 		}
@@ -228,9 +228,9 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 				}
 				enum memberName = getMemberName!(__traits(getMember, T, member));
 				static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
-					output.object[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
+					output[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
 				} else {
-					output.object[memberName] = serialize(__traits(getMember, value, member));
+					output[memberName] = serialize(__traits(getMember, value, member));
 				}
 			}
 		}
@@ -271,20 +271,18 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		return JSONValue(value);
 	}
 	private JSONValue serialize(T)(ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
-		string[] arr;
-		auto output = JSONValue(arr);
+		JSONValue[] output;
 		foreach (value; values) {
-			output.array ~= serialize(value);
+			output ~= serialize(value);
 		}
-		return output;
+		return JSONValue(output);
 	}
 	private JSONValue serialize(T)(ref T values) if (isAssociativeArray!T) {
-		string[string] arr;
-		auto output = JSONValue(arr);
+		JSONValue[string] output;
 		foreach (key, value; values) {
-			output.object[key] = serialize(value);
+			output[key] = serialize(value);
 		}
-		return output;
+		return JSONValue(output);
 	}
 	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));

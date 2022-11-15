@@ -43,13 +43,13 @@ T fromFile(T, Format = AutoDetect, DeSiryulize flags = DeSiryulize.none)(string 
 		}
 	} else { //Not autodetecting
 		import std.algorithm : joiner;
-		import std.file : read;
-		auto lines = () @trusted { return cast(string)read(path); }();
+		import std.file : readText;
+		auto lines = readText(path);
 		return Format.parseInput!(T, flags)(lines, path);
 	}
 }
 ///
-@system unittest {
+@safe unittest {
 	import std.exception : assertThrown;
 	import std.file : exists, remove;
 	import std.stdio : File;
@@ -100,7 +100,7 @@ T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str) if (isSir
 	return Format.parseInput!(T, flags)(str, "<string>");
 }
 ///
-unittest {
+@safe unittest {
 	struct TestStruct {
 		string a;
 	}
@@ -126,7 +126,7 @@ unittest {
 	return Format.asString!flags(data);
 }
 ///
-unittest {
+@safe unittest {
 	//3 as a JSON object
 	assert(3.toString!JSON == `3`);
 	//"str" as a JSON object
@@ -169,7 +169,7 @@ alias toFormattedString = toString;
 	}
 }
 ///
-unittest {
+@safe unittest {
 	import std.exception : assertThrown;
 	import std.file : exists, remove;
 	struct TestStruct {
@@ -234,24 +234,20 @@ version(unittest) {
 		string aString;
 		uint[] emptyArray;
 		Nullable!uint aNullable;
-		Nullable!(uint,0) anotherNullable;
+		Nullable!(uint, 0) anotherNullable;
 		Nullable!SysTime noDate;
 		Nullable!TestEnum noEnum;
-		void toString(W)(ref W sink) @safe const {
+		void toString(W)(ref W sink) @trusted const { //@trusted because of a Nullable!(T, typeof(T)).toString. also it's just for test purposes and doesn't matter
 			import std.format : formattedWrite;
-			sink("TestNull(");
-			formattedWrite(sink, "%s, ", notNull);
-			formattedWrite(sink, "%s, ", aString);
-			formattedWrite(sink, "%s, ", emptyArray);
-			formattedWrite(sink, "%s, ", aNullable);
-			formattedWrite(sink, "%s, ", anotherNullable);
-			formattedWrite(sink, "%s, ", noDate);
-			formattedWrite(sink, "%s, ", noEnum);
-			sink(")");
+			formattedWrite!"TestNull(%s, %s, %s, %s, %s, %s, %s)"(sink, notNull, aString, emptyArray, aNullable, anotherNullable, noDate, noEnum);
+		}
+		void foo() {
+			NullSink s;
+			toString(s);
 		}
 	}
 }
-@system unittest {
+@safe unittest {
 	import std.algorithm : canFind, filter;
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
@@ -531,6 +527,12 @@ version(unittest) {
 		bool opEquals(const SerializableClass rhs) {
 			return x == rhs.x;
 		}
+		override string toString() @safe{
+			import std.format : format;
+			return format!"SerializableClass(%s)"(x);
+		}
+		alias opEquals = Object.opEquals;
+		bool opEquals(SerializableClass c) @safe { return c.x == x; }
 	}
 	runTest2(new SerializableClass(true), false);
 	runTest2(false, new SerializableClass(true));

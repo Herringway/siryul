@@ -354,3 +354,7 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 	assert(!isSkippableValue!skipNulls(f2));
 	assert(!isSkippableValue!skipNothing(f2));
 }
+
+package void trustedAssign(T, T2)(out T dest, T2 val) @trusted {
+	dest = val;
+}

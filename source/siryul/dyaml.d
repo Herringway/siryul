@@ -110,7 +110,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			try {
 				Type tmp;
 				deserialize(value, path, tmp);
-				result = tmp;
+				trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
 				return;
 			} catch (YAMLDException e) {}
 		}
