@@ -566,7 +566,21 @@ version(unittest) {
 	runTest(c);
 	runTest2(SumTestA(20, "hi"), a);
 	runTest2(SumTestB(true, 123.0), b);
-
+	static struct SumTest2 {
+		SumType!(double, string) value;
+		this(string str) {
+			value = str;
+		}
+		this(double val) {
+			value = val;
+		}
+	}
+	static struct SumTest2Alt {
+		double value;
+	}
+	runTest(SumTest2("hello"));
+	runTest(SumTest2(2.0));
+	runTest2(SumTest2(2.0), SumTest2Alt(2.0));
 	static struct LargeStruct {
 		@disable this(this);
 		uint[0x10000] largeData;

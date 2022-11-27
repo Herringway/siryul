@@ -31,23 +31,21 @@ private void expect(T...)(JSONValue node, T types, string file = __FILE__, ulong
 template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 	import std.traits : isAggregateType;
 	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == enum)) {
-		import std.conv : to;
 		import std.traits : OriginalType;
 		if (value.type == JSONType.string) {
-			result = value.str.to!T;
+			result = value.str.tryConvert!T;
 		} else {
 			OriginalType!T tmp;
 			deserialize(value, path, tmp);
-			result = tmp.to!T;
+			result = tmp.tryConvert!T;
 		}
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isIntegral!T && !is(T == enum)) {
-		import std.conv : to;
 		expect(value, JSONType.integer, JSONType.string);
 		if (value.type == JSONType.string) {
-			result = value.str.to!T;
+			result = value.str.tryConvert!T;
 		} else {
-			result = value.integer.to!T;
+			result = value.integer.tryConvert!T;
 		}
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isNullable!T) {
@@ -71,27 +69,25 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		throw new JSONDException("No matching types");
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isFloatingPoint!T) {
-		import std.conv : to;
 		expect(value, JSONType.float_, JSONType.integer, JSONType.string);
 		if (value.type == JSONType.string) {
-			result =value.str.to!T;
+			result =value.str.tryConvert!T;
 		} else if (value.type == JSONType.integer) {
-			result = value.integer.to!T;
+			result = value.integer.tryConvert!T;
 		} else {
-			result = value.floating.to!T;
+			result = value.floating.tryConvert!T;
 		}
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeString!T) {
-		import std.conv : to;
 		expect(value, JSONType.string, JSONType.integer, JSONType.null_, JSONType.float_);
 		if (value.type == JSONType.integer) {
-			result = value.integer.to!T;
+			result = value.integer.tryConvert!T;
 		} else if (value.type == JSONType.float_) {
-			result = value.floating.to!T;
+			result = value.floating.tryConvert!T;
 		} else if (value.type == JSONType.null_) {
 			result = T.init;
 		} else {
-			result = value.str.to!T;
+			result = value.str.tryConvert!T;
 		}
 	}
 	void deserialize(T : P*, P)(JSONValue value, string path, out T result) {
@@ -142,13 +138,12 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		}
 	}
 	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeChar!T) {
-		import std.conv : to;
 		import std.range.primitives : front;
 		expect(value, JSONType.string, JSONType.null_);
 		if (value.type == JSONType.null_) {
 			result = T.init;
 		} else {
-			result = value.str.front.to!T;
+			result = value.str.front.tryConvert!T;
 		}
 	}
 	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
@@ -309,5 +304,15 @@ class UnexpectedTypeException : JSONDException {
 		import std.format : format;
 		import std.exception : assumeWontThrow, ifThrown;
 		super("Expecting JSON types "~assumeWontThrow(format!"%(%s, %)"(expectedTypes))~", got "~assumeWontThrow(unexpectedType.text.ifThrown("Unknown")), file, line);
+	}
+}
+
+private T tryConvert(T, V)(V value) {
+	import std.conv : ConvException, to;
+	import std.format : format;
+	try {
+		return value.to!T;
+	} catch (ConvException) {
+		throw new JSONDException(format!("Cannot convert value '%s' to type "~T.stringof)(value));
 	}
 }

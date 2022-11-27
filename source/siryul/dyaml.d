@@ -74,22 +74,20 @@ private void expect(Node node, NodeID expected, string file = __FILE__, ulong li
 	enforce(node.nodeID == expected, new YAMLUnexpectedNodeIDException(node, expected, file, line));
 }
 template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
-	import std.conv : to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
 	import std.range : enumerate, isOutputRange, put;
 	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAggregateType, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
-		import std.conv : to;
 		import std.traits : OriginalType;
 		expect(value, NodeID.scalar);
 		if (value.tag == `tag:yaml.org,2002:str`) {
-			result = value.get!string.to!T;
+			result = value.get!string.tryConvert!T(value.startMark);
 		} else {
 			OriginalType!T tmp;
 			deserialize(value, path, tmp);
-			result = tmp.to!T;
+			result = tmp.tryConvert!T(value.startMark);
 		}
 	}
 	void deserialize(Node value, string path, out TimeOfDay result) {
@@ -199,7 +197,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	}
 	void deserialize(T)(Node value, string path, out T result) if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
 		expect(value, NodeID.scalar);
-		result = value.get!SysTime.to!T;
+		result = value.get!SysTime.tryConvert!T(value.startMark);
 	}
 	void deserialize(T)(Node value, string path, out T result) if (isSomeChar!T) {
 		import std.array : front;
@@ -211,12 +209,12 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(Node value, string path, out T result) if (isSomeString!T && !canStoreUnchanged!T) {
 		string str;
 		deserialize(value, path, str);
-		result = str.to!T;
+		result = str.tryConvert!T(value.startMark);
 	}
 	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T) {
 		expect(value, NodeID.scalar);
 		if (value.tag == `tag:yaml.org,2002:str`) {
-			result = value.get!string.to!T;
+			result = value.get!string.tryConvert!T(value.startMark);
 		} else {
 			static if (isIntegral!T) {
 				enforce(value.tag == `tag:yaml.org,2002:int`, new YAMLDException(value.startMark, "Attempted to read a float as an integer"));
@@ -347,4 +345,14 @@ private template expectedTag(T) {
 private template canStoreUnchanged(T) {
 	import std.traits : isFloatingPoint, isIntegral;
 	enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string));
+}
+
+private T tryConvert(T, V)(V value, Mark location) {
+	import std.conv : ConvException, to;
+	import std.format : format;
+	try {
+		return value.to!T;
+	} catch (ConvException) {
+		throw new YAMLDException(location, format!("Cannot convert value '%s' to type "~T.stringof)(value));
+	}
 }
