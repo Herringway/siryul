@@ -98,7 +98,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		result = new P;
 		deserialize(value, path, *result);
 	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T) {
+	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
 		static if (isTimeType!T) {
 			string dateString;
 			deserialize(value, path, dateString);
@@ -213,11 +213,17 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		deserialize(value, path, tmp);
 		result = deserializationMethod!T(tmp);
 	}
+	void deserialize(T)(JSONValue value, string path, out T result) if (isAggregateType!T && hasDeserializationTemplate!T) {
+		import std.traits : Parameters;
+		Parameters!(T.fromSiryulType!())[0] tmp;
+		deserialize(value, path, tmp);
+		result = deserializationTemplate!T(tmp);
+	}
 }
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	import std.traits : hasUDA, isAggregateType, Unqual;
-	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T) {
+	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
 		import std.traits : FieldNameTuple;
 		string[string] arr;
 		auto output = JSONValue(arr);
@@ -286,6 +292,9 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	}
 	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
+	}
+	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
+		return serialize(__traits(getMember, value, __traits(identifier, serializationTemplate!T)));
 	}
 }
 private template canStoreUnchanged(T) {

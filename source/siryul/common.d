@@ -116,6 +116,11 @@ alias serializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod)[0];
 enum hasDeserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod).length == 1;
 alias deserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod)[0];
 
+enum hasSerializationTemplate(T) = is(typeof(T.toSiryulType));
+alias serializationTemplate(T) = T.toSiryulType;
+enum hasDeserializationTemplate(T) = is(typeof(T.fromSiryulType));
+alias deserializationTemplate(T) = T.fromSiryulType;
+
 alias isSimpleList = templateAnd!(isIterable, templateNot!isSomeString, templateNot!isAssociativeArray);
 static assert(isSimpleList!(int[]));
 static assert(isSimpleList!(string[]));

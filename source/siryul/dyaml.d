@@ -160,7 +160,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 			}
 		}
 	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T) {
+	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
 		import std.exception : enforce;
 		import std.meta : AliasSeq;
 		import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
@@ -241,6 +241,11 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		deserialize(value, path, tmp);
 		result = deserializationMethod!T(tmp);
 	}
+	void deserialize(T)(Node value, string path, out T result) if (isAggregateType!T && hasDeserializationTemplate!T) {
+		Parameters!(T.fromSiryulType!()) tmp;
+		deserialize(value, path, tmp);
+		result = deserializationTemplate!T(tmp);
+	}
 }
 template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
@@ -285,7 +290,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	private Node serialize(T)(auto ref const T value) if (isPointer!T) {
 		return serialize(*value);
 	}
-	private Node serialize(T)(auto ref const T value) if (is(T == struct) && !hasSerializationMethod!T) {
+	private Node serialize(T)(auto ref const T value) if (is(T == struct) && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
 		static if (is(T == Date) || is(T == DateTime)) {
 			return Node(value.toISOExtString, "tag:yaml.org,2002:timestamp");
 		} else static if (isSumType!T) {
@@ -323,6 +328,9 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	}
 	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
+	}
+	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
+		return serialize(__traits(getMember, value, __traits(identifier, serializationTemplate!T)));
 	}
 }
 private template expectedTag(T) {

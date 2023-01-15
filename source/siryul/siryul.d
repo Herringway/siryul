@@ -573,6 +573,20 @@ version(unittest) {
 	}
 	auto largeVal = new LargeStruct;
 	runTest(largeVal);
+
+	static struct NewHelper {
+		bool val;
+		int toSiryulType()() @safe {
+			return val;
+		}
+		static NewHelper fromSiryulType()(int val) @safe {
+			return NewHelper(!!val);
+		}
+	}
+	runTest2(NewHelper(true), 1);
+	runTest2(NewHelper(false), 0);
+	runTest2(1, NewHelper(true));
+	runTest2(0, NewHelper(false));
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;
