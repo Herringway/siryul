@@ -246,6 +246,7 @@ version(unittest) {
 			toString(s);
 		}
 	}
+	auto sampleTime = SysTime(DateTime(2015, 10, 7, 15, 4, 46), UTC());
 }
 @safe unittest {
 	import std.algorithm : canFind, filter;
@@ -408,7 +409,7 @@ version(unittest) {
 	struct TimeTest {
 		@CustomParser("fromJunk", "toJunk") SysTime time;
 		static SysTime fromJunk(string) @safe {
-			return SysTime(DateTime(2015,10,7,15,4,46),UTC());
+			return sampleTime;
 		}
 		static string toJunk(SysTime) @safe {
 			return "this has nothing to do with time.";
@@ -417,8 +418,8 @@ version(unittest) {
 	struct TimeTestString {
 		string time;
 	}
-	runTest2(TimeTest(SysTime(DateTime(2015,10,7,15,4,46),UTC())), TimeTestString("this has nothing to do with time."));
-	runTest2(TimeTestString("this has nothing to do with time."), TimeTest(SysTime(DateTime(2015,10,7,15,4,46),UTC())));
+	runTest2(TimeTest(sampleTime), TimeTestString("this has nothing to do with time."));
+	runTest2(TimeTestString("this has nothing to do with time."), TimeTest(sampleTime));
 
 	union Unhandleable { //Unions are too dangerous to handle automatically
 		int a;
@@ -601,6 +602,8 @@ version(unittest) {
 	runTest2(NewHelper(false), 0);
 	runTest2(1, NewHelper(true));
 	runTest2(0, NewHelper(false));
+	const systime = sampleTime;
+	runTest2(systime, sampleTime);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

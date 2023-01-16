@@ -222,9 +222,19 @@ template isStaticString(T) {
 }
 template isTimeType(T) {
 	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
-	enum isTimeType = is(T == SysTime) || is(T == DateTime) || is(T == Date) || is(T == TimeOfDay);
+	enum isTimeType = is(T : const SysTime) || is(T : const DateTime) || is(T : const Date) || is(T : const TimeOfDay);
 }
-
+version(unittest) {
+	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
+	static assert(isTimeType!SysTime);
+	static assert(isTimeType!DateTime);
+	static assert(isTimeType!Date);
+	static assert(isTimeType!TimeOfDay);
+	static assert(isTimeType!(immutable SysTime));
+	static assert(isTimeType!(immutable DateTime));
+	static assert(isTimeType!(immutable Date));
+	static assert(isTimeType!(immutable TimeOfDay));
+}
 bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @safe pure {
 	import std.traits : hasMember, isFloatingPoint;
 	bool result = false;

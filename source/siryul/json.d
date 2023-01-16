@@ -289,7 +289,8 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
 	}
 	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
-		return serialize(__traits(getMember, value, __traits(identifier, serializationTemplate!T)));
+		const v = __traits(getMember, value, __traits(identifier, serializationTemplate!T));
+		return serialize(v);
 	}
 }
 private template canStoreUnchanged(T) {

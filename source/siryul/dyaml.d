@@ -328,7 +328,8 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
 	}
 	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
-		return serialize(__traits(getMember, value, __traits(identifier, serializationTemplate!T)));
+		const v = __traits(getMember, value, __traits(identifier, serializationTemplate!T));
+		return serialize(v);
 	}
 }
 private template expectedTag(T) {
