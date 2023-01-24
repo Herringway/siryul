@@ -1,6 +1,7 @@
 module siryul.dyaml;
 import dyaml;
 import siryul.common;
+import core.time : Duration;
 import std.range.primitives : ElementType, isInfinite, isInputRange;
 import std.traits : isSomeChar;
 import std.typecons;
@@ -199,6 +200,10 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		expect(value, NodeID.scalar);
 		result = value.get!SysTime.tryConvert!T(value.startMark);
 	}
+	void deserialize(Node value, string path, out Duration result) {
+		expect(value, NodeID.scalar);
+		result = value.get!string.fromISODurationString();
+	}
 	void deserialize(T)(Node value, string path, out T result) if (isSomeChar!T) {
 		import std.array : front;
 		if (value.type != NodeType.null_) {
@@ -257,6 +262,9 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	}
 	private Node serialize(ref const TimeOfDay value) {
 		return Node(value.toISOExtString);
+	}
+	private Node serialize(ref const Duration value) {
+		return Node(value.asISO8601String.text);
 	}
 	private Node serialize(T)(auto ref const T value) if (isSomeChar!T) {
 		return serialize([value]);

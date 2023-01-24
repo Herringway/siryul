@@ -604,6 +604,7 @@ version(unittest) {
 	runTest2(0, NewHelper(false));
 	const systime = sampleTime;
 	runTest2(systime, sampleTime);
+	runTest(1.hours);
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

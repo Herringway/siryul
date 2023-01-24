@@ -1,4 +1,5 @@
 module siryul.json;
+import core.time : Duration;
 private import siryul.common;
 private import std.json : JSONValue, JSONType, parseJSON, toJSON;
 private import std.range.primitives : ElementType, isInfinite, isInputRange, isOutputRange;
@@ -99,6 +100,10 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 			string dateString;
 			deserialize(value, path, dateString);
 			result = T.fromISOExtString(dateString);
+		} else static if (is(T : Duration)) {
+			string durationString;
+			deserialize(value, path, durationString);
+			result = fromISODurationString(durationString);
 		} else {
 			import std.exception : enforce;
 			import std.meta : AliasSeq;
@@ -260,6 +265,10 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	}
 	private JSONValue serialize(T)(ref const T value) if (isTimeType!T) {
 		return JSONValue(value.toISOExtString());
+	}
+	private JSONValue serialize(ref const Duration value) {
+		import std.conv : text;
+		return JSONValue(value.asISO8601String().text);
 	}
 	private JSONValue serialize(T)(ref const T value) if (isSomeChar!T) {
 		return JSONValue([value]);

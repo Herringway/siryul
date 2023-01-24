@@ -4,6 +4,7 @@ import std.range : isInputRange, isOutputRange;
 import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isInstanceOf, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
 import std.typecons : BitFlags, Nullable, NullableRef;
 import std.sumtype : SumType;
+import core.time;
 
 ///Serialization options
 enum Siryulize {
@@ -372,4 +373,132 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 
 package void trustedAssign(T, T2)(out T dest, T2 val) @trusted {
 	dest = val;
+}
+
+private struct ISO8601FormattedDuration {
+	Duration duration;
+	void tmp() {
+		import std.array : Appender;
+		Appender!(char[]) a;
+		toString(a);
+	}
+	void toString(W)(ref W writer) const {
+		import std.format : formattedWrite, sformat;
+		import std.range : put;
+		Duration temp = duration;
+		put(writer, 'P');
+		if (temp >= 1.weeks) {
+			writer.formattedWrite!"%sW"(temp.total!"weeks");
+			temp -= temp.total!"weeks".weeks;
+		}
+		if (temp >= 1.days) {
+			writer.formattedWrite!"%sD"(temp.total!"days");
+			temp -= temp.total!"days".days;
+		}
+		bool timePrinted;
+		if (temp >= 1.hours) {
+			writer.formattedWrite!"T%sH"(temp.total!"hours");
+			temp -= temp.total!"hours".hours;
+			timePrinted = true;
+		}
+		if (temp >= 1.minutes) {
+			if (!timePrinted) {
+				put(writer, 'T');
+				timePrinted = true;
+			}
+			writer.formattedWrite!"%sM"(temp.total!"minutes");
+			temp -= temp.total!"minutes".minutes;
+		}
+		if (temp > 0.seconds) {
+			if (!timePrinted) {
+				put(writer, 'T');
+				timePrinted = true;
+			}
+			writer.formattedWrite!"%s"(temp.total!"seconds");
+			temp -= temp.total!"seconds".seconds;
+			if (temp > 0.seconds) {
+				char[10] buffer;
+				auto formatted = sformat!"%s"(buffer[], temp.total!"hnsecs" /  10_000_000.0);
+				writer.formattedWrite!".%s"(formatted[2 .. $]);
+			}
+			put(writer, 'S');
+		}
+	}
+}
+ISO8601FormattedDuration asISO8601String(Duration duration) @safe pure nothrow {
+	return ISO8601FormattedDuration(duration);
+}
+
+@safe pure unittest {
+	import std.conv : text;
+	assert(1.days.asISO8601String.text == "P1D");
+	assert((1.days + 1.seconds).asISO8601String.text == "P1DT1S");
+	assert(1.seconds.asISO8601String.text == "PT1S");
+	assert((1.seconds + 100.msecs).asISO8601String.text == "PT1.1S");
+}
+
+Duration fromISODurationString(string str) @safe pure {
+	import std.exception : enforce;
+	import std.conv : parse;
+	string dateUnits = "YMWD";
+	string timeUnits = "HMS";
+	Duration result;
+	enforce(str[0] == 'P', new Exception("Not an ISO8601 duration - String does not start with P"));
+	str = str[1 .. $];
+	bool timestamp;
+	while (str.length > 0) {
+		if (str[0] == 'T') {
+			timestamp = true;
+			str = str[1 .. $];
+		}
+		const amount = str.parse!double();
+		if (timestamp) {
+			while ((timeUnits.length > 0) && (timeUnits[0] != str[0])) {
+				timeUnits = timeUnits[1 .. $];
+			}
+			if (timeUnits.length == 0) {
+				throw new Exception("Unexpected time unit '"~str[0]~"' in string");
+			}
+			switch (str[0]) {
+				case 'H':
+					result += (cast(long)amount).hours;
+					break;
+				case 'M':
+					result += (cast(long)amount).minutes;
+					break;
+				case 'S':
+					result += (cast(long)amount).seconds;
+					result += (cast(long)(amount * 10_000_000)).hnsecs;
+					break;
+				default: assert(0);
+			}
+		} else {
+			while ((dateUnits.length > 0) && (dateUnits[0] != str[0])) {
+				dateUnits = dateUnits[1 .. $];
+			}
+			if (dateUnits.length == 0) {
+				throw new Exception("Unexpected date unit '"~str[0]~"' in string");
+			}
+			switch (str[0]) {
+				case 'Y':
+				case 'M':
+					throw new Exception("Ambiguous date unit '"~str[0]~"' in string");
+				case 'W':
+					result += (cast(long)amount).weeks;
+					break;
+				case 'D':
+					result += (cast(long)amount).days;
+					break;
+				default: assert(0);
+			}
+		}
+		str = str[1 .. $];
+	}
+	return result;
+}
+
+@safe pure unittest {
+	assert("P1D".fromISODurationString == 1.days);
+	assert("P1W1D".fromISODurationString == 1.weeks + 1.days);
+	assert("P1W1DT0.5S".fromISODurationString == 1.weeks + 1.days + 500.msecs);
 }
