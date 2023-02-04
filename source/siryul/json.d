@@ -107,7 +107,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 		} else {
 			import std.exception : enforce;
 			import std.meta : AliasSeq;
-			import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+			import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 			expect(value, JSONType.object);
 			foreach (member; FieldNameTuple!T) {
 				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
@@ -116,7 +116,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 					alias field = AliasSeq!(__traits(getMember, T, member));
 					enum memberName = getMemberName!field;
 					const valueIsAbsent = (memberName !in value.objectNoRef) || (value.objectNoRef[memberName].type == JSONType.null_);
-					static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
+					static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
 						if (!hasConvertFromFunc!(T, field) && valueIsAbsent) {
 							continue;
 						}
@@ -222,7 +222,7 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 }
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
-	import std.traits : hasUDA, isAggregateType, Unqual;
+	import std.traits : isAggregateType, Unqual;
 	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
 		import std.traits : FieldNameTuple;
 		string[string] arr;
@@ -256,7 +256,7 @@ template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	private JSONValue serialize(const typeof(null) value) {
 		return JSONValue();
 	}
-	private JSONValue serialize(T)(ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private JSONValue serialize(T)(ref const T value) if (shouldStringify!value || is(T == enum)) {
 		import std.conv : text;
 		return JSONValue(value.text);
 	}

@@ -1,5 +1,5 @@
 module siryul.common;
-import std.meta : templateAnd, templateNot, templateOr;
+import std.meta : Filter, templateAnd, templateNot, templateOr;
 import std.range : isInputRange, isOutputRange;
 import std.traits : arity, getSymbolsByUDA, getUDAs, hasUDA, isArray, isAssociativeArray, isInstanceOf, isIterable, isSomeString, TemplateArgsOf, TemplateOf;
 import std.typecons : BitFlags, Nullable, NullableRef;
@@ -79,15 +79,17 @@ struct SiryulizeAs {
 	///Serialized field name
 	string name;
 }
+private struct Optional_ {}
+private struct Required_ {}
 /++
  + Used when nonpresence of field is not an error. The field will be set to its
  + .init value. If being able to detect nonpresence is desired, ensure that
  + the default value cannot appear in the data or use a Nullable type.
  +/
-enum Optional;
+enum Optional = Optional_.init;
 
 ///Used when nonpresence of field is an error.
-enum Required;
+enum Required = Required_.init;
 
 /++
  + Use custom parser functions for a given field.
@@ -103,19 +105,45 @@ struct CustomParser {
 	///Function to be used in serialization
 	string toFunc;
 }
+private struct AsString_ {}
+private struct AsBinary_ {}
+private struct SerializationMethod_ {}
+private struct DeserializationMethod_ {}
 ///Write field as string
-enum AsString;
+enum AsString = AsString_.init;
 ///Write field as binary (NYI)
-enum AsBinary;
+enum AsBinary = AsBinary_.init;
 ///Marks a method for use in serialization
-enum SerializationMethod;
+enum SerializationMethod = SerializationMethod_.init;
 ///Marks a method for use in deserialization
-enum DeserializationMethod;
+enum DeserializationMethod= DeserializationMethod_.init;
 
-enum hasSerializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod).length == 1;
-alias serializationMethod(T) = getSymbolsByUDA!(T, SerializationMethod)[0];
-enum hasDeserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod).length == 1;
-alias deserializationMethod(T) = getSymbolsByUDA!(T, DeserializationMethod)[0];
+enum hasSerializationMethod(alias T) = is(typeof(serializationMethod!T));
+template serializationMethod(alias T) {
+	static foreach (m; __traits(allMembers, T)) {
+		static foreach (overload; __traits(getOverloads, T, m)) {
+			static if (!is(typeof(serializationMethod_)) && isSerializationMethod!overload) {
+				alias serializationMethod_ = overload;
+			} else static if (isSerializationMethod!overload) {
+				static assert(!is(typeof(serializationMethod_)), "Only one serialization method may be specified");
+			}
+		}
+	}
+	alias serializationMethod = serializationMethod_;
+}
+template deserializationMethod(alias T) {
+	static foreach (m; __traits(allMembers, T)) {
+		static foreach (overload; __traits(getOverloads, T, m)) {
+			static if (!is(typeof(deserializationMethod_)) && isDeserializationMethod!overload) {
+				alias deserializationMethod_ = overload;
+			} else static if (isDeserializationMethod!overload) {
+				static assert(!is(typeof(deserializationMethod_)), "Only one deserialization method may be specified");
+			}
+		}
+	}
+	alias deserializationMethod = deserializationMethod_;
+}
+enum hasDeserializationMethod(alias T) = is(typeof(deserializationMethod!T));
 
 enum hasSerializationTemplate(T) = is(typeof(T.toSiryulType));
 alias serializationTemplate(T) = T.toSiryulType;
@@ -135,7 +163,7 @@ package template getMemberName(alias T) {
 	static if (hasUDA!(T, SiryulizeAs)) {
 		enum getMemberName = getUDAs!(T, SiryulizeAs)[0].name;
 	} else
-		enum getMemberName = T.stringof;
+		enum getMemberName = __traits(identifier, T);
 }
 unittest {
 	struct TestStruct {
@@ -502,3 +530,17 @@ Duration fromISODurationString(string str) @safe pure {
 	assert("P1W1D".fromISODurationString == 1.weeks + 1.days);
 	assert("P1W1DT0.5S".fromISODurationString == 1.weeks + 1.days + 500.msecs);
 }
+
+private template typeMatches(T) {
+	enum typeMatches(alias t) = is(typeof(t) == T);
+}
+
+enum isSerializationMethod(alias sym) = Filter!(typeMatches!SerializationMethod_, __traits(getAttributes, sym)).length == 1;
+
+enum isDeserializationMethod(alias sym) = Filter!(typeMatches!DeserializationMethod_, __traits(getAttributes, sym)).length == 1;
+
+enum isOptional(alias sym) = Filter!(typeMatches!Optional_, __traits(getAttributes, sym)).length == 1;
+
+enum isRequired(alias sym) = Filter!(typeMatches!Required_, __traits(getAttributes, sym)).length == 1;
+
+enum shouldStringify(alias sym) = Filter!(typeMatches!AsString_, __traits(getAttributes, sym)).length == 1;

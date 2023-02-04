@@ -78,7 +78,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.exception : enforce;
 	import std.range : enumerate, isOutputRange, put;
-	import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAggregateType, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+	import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAggregateType, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 	import std.utf : byCodeUnit;
 	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
 		import std.traits : OriginalType;
@@ -162,7 +162,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
 		import std.exception : enforce;
 		import std.meta : AliasSeq;
-		import std.traits : arity, FieldNameTuple, ForeachType, getUDAs, hasIndirections, hasUDA, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+		import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 		expect(value, NodeID.mapping);
 		foreach (member; FieldNameTuple!T) {
 			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
@@ -171,7 +171,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 				alias field = AliasSeq!(__traits(getMember, T, member));
 				enum memberName = getMemberName!field;
 				const valueIsAbsent = memberName !in value;
-				static if ((hasUDA!(field, Optional) || (!!(flags & DeSiryulize.optionalByDefault)) && !hasUDA!(field, Required)) || hasIndirections!(typeof(field))) {
+				static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
 					if (!hasConvertFromFunc!(T, field) && valueIsAbsent) {
 						continue;
 					}
@@ -253,7 +253,7 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.traits : arity, FieldNameTuple, getSymbolsByUDA, getUDAs, hasUDA, isAggregateType, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
+	import std.traits : arity, FieldNameTuple, isAggregateType, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
 	private Node serialize(const typeof(null) value) {
 		return Node(YAMLNull());
 	}
@@ -276,7 +276,7 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 		import std.utf : toUTF8;
 		return serialize(value[].toUTF8().idup);
 	}
-	private Node serialize(T)(auto ref const T value) if (hasUDA!(value, AsString) || is(T == enum)) {
+	private Node serialize(T)(auto ref const T value) if (shouldStringify!value || is(T == enum)) {
 		return Node(value.text);
 	}
 	private Node serialize(T)(auto ref const T value) if (isAssociativeArray!T) {
