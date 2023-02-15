@@ -464,6 +464,7 @@ ISO8601FormattedDuration asISO8601String(Duration duration) @safe pure nothrow {
 Duration fromISODurationString(string str) @safe pure {
 	import std.exception : enforce;
 	import std.conv : parse;
+	import std.math : ceil;
 	string dateUnits = "YMWD";
 	string timeUnits = "HMS";
 	Duration result;
@@ -492,7 +493,8 @@ Duration fromISODurationString(string str) @safe pure {
 					break;
 				case 'S':
 					result += (cast(long)amount).seconds;
-					result += (cast(long)(amount * 10_000_000)).hnsecs;
+					double fraction = ceil(amount) - amount;
+					result += (cast(long)(fraction * 10_000_000)).hnsecs;
 					break;
 				default: assert(0);
 			}
@@ -525,6 +527,7 @@ Duration fromISODurationString(string str) @safe pure {
 	assert("P1D".fromISODurationString == 1.days);
 	assert("P1W1D".fromISODurationString == 1.weeks + 1.days);
 	assert("P1W1DT0.5S".fromISODurationString == 1.weeks + 1.days + 500.msecs);
+	assert("PT5S".fromISODurationString == 5.seconds);
 }
 
 private template typeMatches(T) {
