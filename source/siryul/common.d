@@ -192,8 +192,8 @@ package template getConvertToFunc(T, alias member) {
 	static assert(arity!getConvertToFunc == 1, "Arity of conversion function must be exactly 1");
 }
 version(unittest) {
-	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
 	struct TimeTest {
+		import std.datetime : SysTime;
 		@CustomParser("fromJunk", "toJunk") SysTime time;
 		string nothing;
 		static SysTime fromJunk(string) {
@@ -204,6 +204,7 @@ version(unittest) {
 		}
 	}
 	struct TimeTest2 {
+		import std.datetime : SysTime;
 		SysTime time;
 		string nothing;
 		static auto toSiryulHelper(string T)(SysTime) if(T == "time") {
@@ -215,12 +216,14 @@ version(unittest) {
 	}
 }
 unittest {
+	import std.datetime : SysTime;
 	assert(getConvertToFunc!(TimeTest, TimeTest.time)(SysTime.min) == "this has nothing to do with time.");
 	assert(getConvertToFunc!(TimeTest2, TimeTest2.time)(SysTime.min) == "this has nothing to do with time.");
 }
 template hasConvertFromFunc(T, alias member) {
 	static if (hasUDA!(member, CustomParser)) {
 		enum hasConvertFromFunc = true;
+		import std.datetime : SysTime;
 	} else static if (is(typeof(T.fromSiryulHelper!(member.stringof)))) {
 		enum hasConvertFromFunc = true;
 	} else {
@@ -237,6 +240,7 @@ package template getConvertFromFunc(T, alias member) {
 	static assert(arity!getConvertFromFunc == 1, "Arity of conversion function must be exactly 1");
 }
 unittest {
+	import std.datetime : SysTime;
 	auto str1 = "yep";
 	assert(getConvertFromFunc!(TimeTest, TimeTest.time)(str1) == SysTime.min);
 	assert(getConvertFromFunc!(TimeTest2, TimeTest2.time)(str1) == SysTime.min);
@@ -248,9 +252,11 @@ template isStaticString(T) {
 	enum isStaticString = isStaticArray!T && isSomeChar!(ElementType!T);
 }
 template isTimeType(T) {
+	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
 	enum isTimeType = is(T : const SysTime) || is(T : const DateTime) || is(T : const Date) || is(T : const TimeOfDay);
 }
-version(unittest) {
+unittest {
+	import std.datetime : DateTime, Date, SysTime, TimeOfDay;
 	static assert(isTimeType!SysTime);
 	static assert(isTimeType!DateTime);
 	static assert(isTimeType!Date);
