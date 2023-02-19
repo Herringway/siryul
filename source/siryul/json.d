@@ -110,10 +110,10 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 			import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 			expect(value, JSONType.object);
 			foreach (member; FieldNameTuple!T) {
-				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+				alias field = AliasSeq!(__traits(getMember, T, member));
+				static if (!mustSkip!field && __traits(getProtection, field) == "public") {
 					debug string newPath = path~"."~member;
 					else string newPath = path;
-					alias field = AliasSeq!(__traits(getMember, T, member));
 					enum memberName = getMemberName!field;
 					const valueIsAbsent = (memberName !in value.objectNoRef) || (value.objectNoRef[memberName].type == JSONType.null_);
 					static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
@@ -224,17 +224,19 @@ template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
 	import std.traits : isAggregateType, Unqual;
 	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
+		import std.meta : AliasSeq;
 		import std.traits : FieldNameTuple;
 		string[string] arr;
 		auto output = JSONValue(arr);
 		foreach (member; FieldNameTuple!T) {
-			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+			alias field = AliasSeq!(__traits(getMember, T, member));
+			static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
 				if (__traits(getMember, value, member).isSkippableValue!flags) {
 					continue;
 				}
-				enum memberName = getMemberName!(__traits(getMember, T, member));
-				static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
-					output[memberName] = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
+				enum memberName = getMemberName!field;
+				static if (hasConvertToFunc!(T, field)) {
+					output[memberName] = serialize(getConvertToFunc!(T, field)(__traits(getMember, value, member)));
 				} else {
 					output[memberName] = serialize(__traits(getMember, value, member));
 				}

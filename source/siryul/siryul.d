@@ -605,6 +605,14 @@ version(unittest) {
 	const systime = sampleTime;
 	runTest2(systime, sampleTime);
 	runTest(1.hours);
+	static struct SkipTest {
+		@Skip int val;
+		@Skip int defaultValue = 75;
+		@Skip SkipTest* unhandled;
+	}
+	static struct Nothing {}
+	runTest2(SkipTest(42, 13), SkipTest());
+	runTest2(SkipTest(42, 13), Nothing());
 }
 ///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
 enum ISO8601;

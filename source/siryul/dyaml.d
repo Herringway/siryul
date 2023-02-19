@@ -165,10 +165,10 @@ template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
 		import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
 		expect(value, NodeID.mapping);
 		foreach (member; FieldNameTuple!T) {
-			static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+			alias field = AliasSeq!(__traits(getMember, T, member));
+			static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
 				debug string newPath = path~"."~member;
 				else string newPath = path;
-				alias field = AliasSeq!(__traits(getMember, T, member));
 				enum memberName = getMemberName!field;
 				const valueIsAbsent = memberName !in value;
 				static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
@@ -309,17 +309,19 @@ template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 				return serialize(value.get);
 			}
 		} else {
+			import std.meta : AliasSeq;
 			static string[] empty;
 			Node output = Node(empty, empty);
 			foreach (member; FieldNameTuple!T) {
-				static if (__traits(getProtection, __traits(getMember, T, member)) == "public") {
+				alias field = AliasSeq!(__traits(getMember, T, member));
+				static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
 					if (__traits(getMember, value, member).isSkippableValue!flags) {
 						continue;
 					}
-					enum memberName = getMemberName!(__traits(getMember, T, member));
+					enum memberName = getMemberName!field;
 					try {
-						static if (hasConvertToFunc!(T, __traits(getMember, T, member))) {
-							auto val = serialize(getConvertToFunc!(T, __traits(getMember, T, member))(__traits(getMember, value, member)));
+						static if (hasConvertToFunc!(T, field)) {
+							auto val = serialize(getConvertToFunc!(T, field)(__traits(getMember, value, member)));
 							output.add(memberName, val);
 						} else {
 							output.add(memberName, serialize(__traits(getMember, value, member)));

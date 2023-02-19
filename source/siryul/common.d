@@ -81,6 +81,7 @@ struct SiryulizeAs {
 }
 private struct Optional_ {}
 private struct Required_ {}
+private struct Skip_ {}
 /++
  + Used when nonpresence of field is not an error. The field will be set to its
  + .init value. If being able to detect nonpresence is desired, ensure that
@@ -90,6 +91,9 @@ enum Optional = Optional_.init;
 
 ///Used when nonpresence of field is an error.
 enum Required = Required_.init;
+
+///Used for fields that should be skipped
+enum Skip = Skip_.init;
 
 /++
  + Use custom parser functions for a given field.
@@ -547,5 +551,7 @@ enum isDeserializationMethod(alias sym) = Filter!(typeMatches!DeserializationMet
 enum isOptional(alias sym) = Filter!(typeMatches!Optional_, __traits(getAttributes, sym)).length == 1;
 
 enum isRequired(alias sym) = Filter!(typeMatches!Required_, __traits(getAttributes, sym)).length == 1;
+
+enum mustSkip(alias sym) = Filter!(typeMatches!Skip_, __traits(getAttributes, sym)).length == 1;
 
 enum shouldStringify(alias sym) = Filter!(typeMatches!AsString_, __traits(getAttributes, sym)).length == 1;
