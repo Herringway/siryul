@@ -14,17 +14,17 @@ struct YAML {
 	alias extensions = AliasSeq!(".yml", ".yaml");
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
+		import std.format : format;
 		import std.utf : byChar;
 		auto str = data.byChar.to!(char[]);
 		auto loader = Loader.fromString(str);
 		loader.name = filename;
 		try {
 			T result;
-			deserialize(YAMLNode(loader.load()), result, BitFlags!DeSiryulize(flags));
+			deserialize(Node(loader.load()), result, BitFlags!DeSiryulize(flags));
 			return result;
-		} catch (NodeException e) {
-			debug(norethrow) throw e;
-			else throw new YAMLDException(dyaml.Mark(filename, 0, 0), e.msg);
+		} catch (MarkedYAMLException e) {
+			throw new DeserializeException(convertMark(e.mark), format!"Parsing error: %s"(e.msg));
 		}
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -37,104 +37,84 @@ struct YAML {
 		dumper.dump(buf, serialize!(YAML, BitFlags!Siryulize(flags))(data));
 		return buf.data;
 	}
-}
-
-struct YAMLNode {
-	private Node node;
-	Nullable!(siryul.common.Mark) getMark() const @safe pure nothrow {
+	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow @nogc {
 		siryul.common.Mark mark;
 		with (mark) {
-			filename = node.startMark.name;
-			line = node.startMark.line;
-			column = node.startMark.column;
+			filename = dyamlMark.name;
+			line = dyamlMark.line;
+			column = dyamlMark.column;
 		}
-		return typeof(return)(mark);
+		return mark;
 	}
-	bool hasTypeConvertible(T)() const {
-		static if (is(T == typeof(null))) {
-			return node.type == NodeType.null_;
-		} else static if (is(T : Duration)) {
-			return false;
-		} else {
-			return node.tag == expectedTag!T;
+	static struct Node {
+		private dyaml.Node node;
+		Nullable!(siryul.common.Mark) getMark() const @safe pure nothrow {
+			return typeof(return)(convertMark(node.startMark));
 		}
-	}
-	T getType(T)() {
-		import std.datetime : SysTime;
-		static if (is(T == typeof(null))) {
-			return node.type == NodeType.null_;
-		} else static if (is(T: const(char)[])) {
-			return node.get!string;
-		} else static if (is(T : bool)) {
-			return node.get!bool;
-		} else static if (is(T == ulong)) {
-			return node.get!ulong;
-		} else static if (is(T == long)) {
-			return node.get!long;
-		} else static if (is(T : real)) {
-			return node.get!real;
-		} else static if (is(T : SysTime)) {
-			return node.get!SysTime;
-		} else {
-			assert(0, "Cannot represent type");
-		}
-	}
-	bool hasClass(Classification c) const @safe pure {
-		final switch (c) {
-			case Classification.scalar:
-				return node.nodeID == NodeID.scalar;
-			case Classification.sequence:
-				return node.nodeID == NodeID.sequence;
-			case Classification.mapping:
-				return node.nodeID == NodeID.mapping;
-		}
-	}
-	YAMLNode opIndex(size_t index) @safe {
-		return YAMLNode(node[index]);
-	}
-	YAMLNode opIndex(string index) @safe {
-		return YAMLNode(node[index]);
-	}
-	size_t length() const @safe {
-		return node.length;
-	}
-	bool opBinaryRight(string op : "in")(string key) {
-		return !!(key in node);
-	}
-	int opApply(scope int delegate(string k, YAMLNode v) @safe dg) @safe {
-		foreach (Node k, Node v; node) {
-			const result = dg(k.get!string, YAMLNode(v));
-			if (result != 0) {
-				return result;
+		bool hasTypeConvertible(T)() const {
+			static if (is(T == typeof(null))) {
+				return node.type == NodeType.null_;
+			} else static if (is(T : Duration)) {
+				return false;
+			} else {
+				return node.tag == expectedTag!T;
 			}
 		}
-		return 0;
+		T getType(T)() {
+			import std.datetime : SysTime;
+			static if (is(T == typeof(null))) {
+				return node.type == NodeType.null_;
+			} else static if (is(T: const(char)[])) {
+				return node.get!string;
+			} else static if (is(T : bool)) {
+				return node.get!bool;
+			} else static if (is(T == ulong)) {
+				return node.get!ulong;
+			} else static if (is(T == long)) {
+				return node.get!long;
+			} else static if (is(T : real)) {
+				return node.get!real;
+			} else static if (is(T : SysTime)) {
+				return node.get!SysTime;
+			} else {
+				assert(0, "Cannot represent type");
+			}
+		}
+		bool hasClass(Classification c) const @safe pure {
+			final switch (c) {
+				case Classification.scalar:
+					return node.nodeID == NodeID.scalar;
+				case Classification.sequence:
+					return node.nodeID == NodeID.sequence;
+				case Classification.mapping:
+					return node.nodeID == NodeID.mapping;
+			}
+		}
+		Node opIndex(size_t index) @safe {
+			return Node(node[index]);
+		}
+		Node opIndex(string index) @safe {
+			return Node(node[index]);
+		}
+		size_t length() const @safe {
+			return node.length;
+		}
+		bool opBinaryRight(string op : "in")(string key) {
+			return !!(key in node);
+		}
+		int opApply(scope int delegate(string k, Node v) @safe dg) @safe {
+			foreach (dyaml.Node k, dyaml.Node v; node) {
+				const result = dg(k.get!string, Node(v));
+				if (result != 0) {
+					return result;
+				}
+			}
+			return 0;
+		}
 	}
 }
 
-/++
- + Thrown on YAML deserialization errors
- +/
-class YAMLUnexpectedNodeIDException : YAMLDException {
-	this(const Node node, NodeID id, string file = __FILE__, size_t line = __LINE__) @safe nothrow {
-		import std.format : format;
-		try {
-			super(node.startMark, format!"Expected a %s, got a %s"(id, node.nodeID), file, line);
-		} catch (Exception) { assert(0); }
-	}
-}
-/++
- + Thrown on YAML deserialization errors
- +/
-class YAMLDException : DeserializeException {
-	this(const dyaml.Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		siryul.common.Mark siryulMark;
-		siryulMark.filename = mark.name;
-		siryulMark.line = mark.line;
-		siryulMark.column = mark.column;
-		super(siryulMark, msg, file, line);
-	}
-}
+
 /++
  + Thrown on YAML serialization errors
  +/
@@ -142,11 +122,6 @@ class YAMLSException : SerializeException {
 	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
-}
-private void expect(Node node, NodeID expected, string file = __FILE__, ulong line = __LINE__) @safe {
-	import std.algorithm : among;
-	import std.exception : enforce;
-	enforce(node.nodeID == expected, new YAMLUnexpectedNodeIDException(node, expected, file, line));
 }
 template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
@@ -262,14 +237,4 @@ private template expectedTag(T) {
 private template canStoreUnchanged(T) {
 	import std.traits : isFloatingPoint, isIntegral;
 	enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string));
-}
-
-private T tryConvert(T, V)(V value, dyaml.Mark location) {
-	import std.conv : ConvException, to;
-	import std.format : format;
-	try {
-		return value.to!T;
-	} catch (ConvException) {
-		throw new YAMLDException(location, format!("Cannot convert value '%s' to type "~T.stringof)(value));
-	}
 }
