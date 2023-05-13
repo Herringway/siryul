@@ -15,7 +15,7 @@ struct JSON {
 	alias extensions = AliasSeq!".json";
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		T output;
-		deserialize!(JSON, BitFlags!DeSiryulize(flags))(parseJSON(data), T.stringof, output);
+		deserialize(JSONNode(parseJSON(data)), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -24,201 +24,80 @@ struct JSON {
 	}
 }
 
+struct JSONNode {
+	private JSONValue value;
+	enum getMark = Nullable!Mark.init;
+	bool hasTypeConvertible(T)() const {
+		static if (is(T == typeof(null))) {
+			return value.type == JSONType.null_;
+		} else static if (is(T: const(char)[])) {
+			return value.type == JSONType.string;
+		} else static if (is(T : bool)) {
+			return (value.type == JSONType.true_) || (value.type == JSONType.false_);
+		} else static if (is(T == long)) {
+			return value.type == JSONType.integer;
+		} else static if (is(T == ulong)) {
+			return value.type == JSONType.uinteger;
+		} else static if (is(T : real)) {
+			return value.type == JSONType.float_;
+		} else {
+			return false;
+		}
+	}
+	bool hasClass(Classification c) const @safe pure {
+		final switch (c) {
+			case Classification.scalar:
+				return (value.type != JSONType.array) && (value.type != JSONType.object);
+			case Classification.sequence:
+				return value.type == JSONType.array;
+			case Classification.mapping:
+				return value.type == JSONType.object;
+		}
+	}
+	T getType(T)() {
+		static if (is(T: const(char)[])) {
+			return value.str;
+		} else static if (is(T : bool)) {
+			return value.boolean;
+		} else static if (is(T : typeof(null))) {
+			return value.type == JSONType.null_;
+		} else static if (is(T == ulong)) {
+			return value.uinteger;
+		} else static if (is(T == long)) {
+			return value.integer;
+		} else static if (is(T : real)) {
+			return value.floating;
+		} else {
+			assert(0, "Cannot represent type");
+		}
+	}
+	JSONNode opIndex(size_t index) @safe {
+		return JSONNode(value.arrayNoRef[index]);
+	}
+	JSONNode opIndex(string index) @safe {
+		return JSONNode(value.objectNoRef[index]);
+	}
+	size_t length() const @safe {
+		return value.arrayNoRef.length;
+	}
+	bool opBinaryRight(string op : "in")(string key) {
+		return !!(key in value);
+	}
+	int opApply(scope int delegate(string k, JSONNode v) @safe dg) @safe {
+		foreach (string k, JSONValue v; value.objectNoRef) {
+			const result = dg(k, JSONNode(v));
+			if (result != 0) {
+				return result;
+			}
+		}
+		return 0;
+	}
+}
+
 private void expect(T...)(JSONValue node, T types, string file = __FILE__, ulong line = __LINE__) {
 	import std.algorithm : among;
 	import std.exception : enforce;
 	enforce(node.type.among(types), new UnexpectedTypeException([types], node.type, file, line));
-}
-template deserialize(Serializer : JSON, BitFlags!DeSiryulize flags) {
-	import std.traits : isAggregateType;
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == enum)) {
-		import std.traits : OriginalType;
-		if (value.type == JSONType.string) {
-			result = value.str.tryConvert!T;
-		} else {
-			OriginalType!T tmp;
-			deserialize(value, path, tmp);
-			result = tmp.tryConvert!T;
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isIntegral!T && !is(T == enum)) {
-		expect(value, JSONType.integer, JSONType.string);
-		if (value.type == JSONType.string) {
-			result = value.str.tryConvert!T;
-		} else {
-			result = value.integer.tryConvert!T;
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isNullable!T) {
-		if (value.type == JSONType.null_) {
-			result.nullify();
-		} else {
-			typeof(result.get) tmp;
-			deserialize(value, path, tmp);
-			result = tmp;
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isSumType!T) {
-		static foreach (Type; T.Types) {
-			try {
-				Type tmp;
-				deserialize(value, path, tmp);
-				trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
-				return;
-			} catch (JSONDException e) {}
-		}
-		throw new JSONDException("No matching types");
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isFloatingPoint!T) {
-		expect(value, JSONType.float_, JSONType.integer, JSONType.string);
-		if (value.type == JSONType.string) {
-			result =value.str.tryConvert!T;
-		} else if (value.type == JSONType.integer) {
-			result = value.integer.tryConvert!T;
-		} else {
-			result = value.floating.tryConvert!T;
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeString!T) {
-		expect(value, JSONType.string, JSONType.integer, JSONType.null_, JSONType.float_);
-		if (value.type == JSONType.integer) {
-			result = value.integer.tryConvert!T;
-		} else if (value.type == JSONType.float_) {
-			result = value.floating.tryConvert!T;
-		} else if (value.type == JSONType.null_) {
-			result = T.init;
-		} else {
-			result = value.str.tryConvert!T;
-		}
-	}
-	void deserialize(T : P*, P)(JSONValue value, string path, out T result) {
-		result = new P;
-		deserialize(value, path, *result);
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
-		static if (isTimeType!T) {
-			string dateString;
-			deserialize(value, path, dateString);
-			result = T.fromISOExtString(dateString);
-		} else static if (is(T : Duration)) {
-			string durationString;
-			deserialize(value, path, durationString);
-			result = fromISODurationString(durationString);
-		} else {
-			import std.exception : enforce;
-			import std.meta : AliasSeq;
-			import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-			expect(value, JSONType.object);
-			foreach (member; FieldNameTuple!T) {
-				alias field = AliasSeq!(__traits(getMember, T, member));
-				static if (!mustSkip!field && __traits(getProtection, field) == "public") {
-					debug string newPath = path~"."~member;
-					else string newPath = path;
-					enum memberName = getMemberName!field;
-					const valueIsAbsent = (memberName !in value.objectNoRef) || (value.objectNoRef[memberName].type == JSONType.null_);
-					static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
-						if (!hasConvertFromFunc!(T, field) && valueIsAbsent) {
-							continue;
-						}
-					} else {
-						enforce!JSONDException(memberName in value.objectNoRef, "Missing non-@Optional "~memberName~" in node");
-					}
-					static if (hasConvertFromFunc!(T, field)) {
-						alias fromFunc = getConvertFromFunc!(T, field);
-						try {
-							Parameters!(fromFunc)[0] param;
-							if (!valueIsAbsent) {
-								deserialize(value[memberName], newPath, param);
-							}
-							__traits(getMember, result, member) = fromFunc(param);
-						} catch (Exception e) {
-							e.msg = "Error deserializing "~newPath~": "~e.msg;
-							throw e;
-						}
-					} else {
-						deserialize(value[memberName], newPath, __traits(getMember, result, member));
-					}
-				}
-			}
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isSomeChar!T) {
-		import std.range.primitives : front;
-		expect(value, JSONType.string, JSONType.null_);
-		if (value.type == JSONType.null_) {
-			result = T.init;
-		} else {
-			result = value.str.front.tryConvert!T;
-		}
-	}
-	void deserialize(T)(JSONValue values, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
-		import std.conv : text;
-		expect(values, JSONType.array);
-		result = new T(values.arrayNoRef.length);
-		foreach (idx, ref element; result) {
-			debug string newPath = path ~ "["~idx.text~"]";
-			else string newPath = path;
-			deserialize(values[idx], newPath, element);
-		}
-	}
-	void deserialize(T)(JSONValue values, string path, out T result) if (isStaticArray!T) {
-		import std.conv : text;
-		import std.traits : ForeachType;
-		static if (isSomeChar!(ElementType!T)) {
-			import std.range : enumerate;
-			import std.utf : byCodeUnit;
-			expect(values, JSONType.string);
-			string str;
-			deserialize(values, path, str);
-			foreach (i, ref chr; result) {
-				chr = str[i];
-			}
-		} else {
-			import std.exception : enforce;
-			expect(values, JSONType.array);
-			enforce!JSONDException(values.arrayNoRef.length == T.length, "Static array length mismatch");
-			foreach (i, JSONValue newNode; values.arrayNoRef) {
-				debug string newPath = path ~ "["~i.text~"]";
-				else string newPath = path;
-				deserialize(newNode, newPath, result[i]);
-			}
-		}
-	}
-
-	void deserialize(T)(JSONValue values, string path, out T result) if (isAssociativeArray!T) {
-		import std.traits : ValueType;
-		expect(values, JSONType.object);
-		foreach (string key, JSONValue value; values.objectNoRef) {
-			debug string newPath = path ~ "["~key~"]";
-			else string newPath = path;
-			ValueType!T v;
-			deserialize(value, newPath, v);
-			result[key] = v;
-		}
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (is(T == bool)) {
-		expect(value, JSONType.true_, JSONType.false_);
-		if (value.type == JSONType.true_) {
-			result = true;
-		} else if (value.type == JSONType.false_) {
-			result = false;
-		} else {
-			assert(false);
-		}
-	}
-	void deserialize(JSONValue, string, out typeof(null)) {}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isAggregateType!T && hasDeserializationMethod!T) {
-		import std.traits : Parameters;
-		Parameters!(deserializationMethod!T) tmp;
-		deserialize(value, path, tmp);
-		result = deserializationMethod!T(tmp);
-	}
-	void deserialize(T)(JSONValue value, string path, out T result) if (isAggregateType!T && hasDeserializationTemplate!T) {
-		import std.traits : Parameters;
-		Parameters!(T.fromSiryulType!())[0] tmp;
-		deserialize(value, path, tmp);
-		result = deserializationTemplate!T(tmp);
-	}
 }
 
 template serialize(Serializer : JSON, BitFlags!Siryulize flags) {

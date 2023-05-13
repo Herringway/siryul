@@ -20,11 +20,11 @@ struct YAML {
 		loader.name = filename;
 		try {
 			T result;
-			deserialize!(YAML, BitFlags!DeSiryulize(flags))(loader.load(), T.stringof, result);
+			deserialize(YAMLNode(loader.load()), result, BitFlags!DeSiryulize(flags));
 			return result;
 		} catch (NodeException e) {
 			debug(norethrow) throw e;
-			else throw new YAMLDException(Mark(filename, 0, 0), e.msg);
+			else throw new YAMLDException(dyaml.Mark(filename, 0, 0), e.msg);
 		}
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -38,6 +38,80 @@ struct YAML {
 		return buf.data;
 	}
 }
+
+struct YAMLNode {
+	private Node node;
+	Nullable!(siryul.common.Mark) getMark() const @safe pure nothrow {
+		siryul.common.Mark mark;
+		with (mark) {
+			filename = node.startMark.name;
+			line = node.startMark.line;
+			column = node.startMark.column;
+		}
+		return typeof(return)(mark);
+	}
+	bool hasTypeConvertible(T)() const {
+		static if (is(T == typeof(null))) {
+			return node.type == NodeType.null_;
+		} else static if (is(T : Duration)) {
+			return false;
+		} else {
+			return node.tag == expectedTag!T;
+		}
+	}
+	T getType(T)() {
+		import std.datetime : SysTime;
+		static if (is(T == typeof(null))) {
+			return node.type == NodeType.null_;
+		} else static if (is(T: const(char)[])) {
+			return node.get!string;
+		} else static if (is(T : bool)) {
+			return node.get!bool;
+		} else static if (is(T == ulong)) {
+			return node.get!ulong;
+		} else static if (is(T == long)) {
+			return node.get!long;
+		} else static if (is(T : real)) {
+			return node.get!real;
+		} else static if (is(T : SysTime)) {
+			return node.get!SysTime;
+		} else {
+			assert(0, "Cannot represent type");
+		}
+	}
+	bool hasClass(Classification c) const @safe pure {
+		final switch (c) {
+			case Classification.scalar:
+				return node.nodeID == NodeID.scalar;
+			case Classification.sequence:
+				return node.nodeID == NodeID.sequence;
+			case Classification.mapping:
+				return node.nodeID == NodeID.mapping;
+		}
+	}
+	YAMLNode opIndex(size_t index) @safe {
+		return YAMLNode(node[index]);
+	}
+	YAMLNode opIndex(string index) @safe {
+		return YAMLNode(node[index]);
+	}
+	size_t length() const @safe {
+		return node.length;
+	}
+	bool opBinaryRight(string op : "in")(string key) {
+		return !!(key in node);
+	}
+	int opApply(scope int delegate(string k, YAMLNode v) @safe dg) @safe {
+		foreach (Node k, Node v; node) {
+			const result = dg(k.get!string, YAMLNode(v));
+			if (result != 0) {
+				return result;
+			}
+		}
+		return 0;
+	}
+}
+
 /++
  + Thrown on YAML deserialization errors
  +/
@@ -53,8 +127,8 @@ class YAMLUnexpectedNodeIDException : YAMLDException {
  + Thrown on YAML deserialization errors
  +/
 class YAMLDException : DeserializeException {
-	this(const Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		ErrorMark siryulMark;
+	this(const dyaml.Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		siryul.common.Mark siryulMark;
 		siryulMark.filename = mark.name;
 		siryulMark.line = mark.line;
 		siryulMark.column = mark.column;
@@ -73,182 +147,6 @@ private void expect(Node node, NodeID expected, string file = __FILE__, ulong li
 	import std.algorithm : among;
 	import std.exception : enforce;
 	enforce(node.nodeID == expected, new YAMLUnexpectedNodeIDException(node, expected, file, line));
-}
-template deserialize(Serializer : YAML, BitFlags!DeSiryulize flags) {
-	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.exception : enforce;
-	import std.range : enumerate, isOutputRange, put;
-	import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAggregateType, isArray, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeString, isStaticArray, KeyType, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-	import std.utf : byCodeUnit;
-	void deserialize(T)(Node value, string path, out T result) if (is(T == enum)) {
-		import std.traits : OriginalType;
-		expect(value, NodeID.scalar);
-		if (value.tag == `tag:yaml.org,2002:str`) {
-			result = value.get!string.tryConvert!T(value.startMark);
-		} else {
-			OriginalType!T tmp;
-			deserialize(value, path, tmp);
-			result = tmp.tryConvert!T(value.startMark);
-		}
-	}
-	void deserialize(Node value, string path, out TimeOfDay result) {
-		expect(value, NodeID.scalar);
-		result = TimeOfDay.fromISOExtString(value.get!string);
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isNullable!T) {
-		if (value.type == NodeType.null_) {
-			result.nullify();
-		} else {
-			typeof(result.get) tmp;
-			deserialize(value, path, tmp);
-			result = tmp;
-		}
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isSumType!T) {
-		static foreach (Type; T.Types) {
-			try {
-				Type tmp;
-				deserialize(value, path, tmp);
-				trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
-				return;
-			} catch (YAMLDException e) {}
-		}
-		throw new YAMLDException(value.startMark, "No matching types");
-	}
-	void deserialize(Node value, string path, out bool result) {
-		enforce(value.tag == `tag:yaml.org,2002:bool`, new YAMLDException(value.startMark, "Expecting a boolean value"));
-		result = value.get!bool;
-	}
-	void deserialize(V, K)(Node value, string path, out V[K] result) {
-		expect(value, NodeID.mapping);
-		foreach (Node k, Node v; value) {
-			K key;
-			V val;
-			deserialize(k, path, key);
-			deserialize(v, path, val);
-			result[key] = val;
-		}
-	}
-	void deserialize(T, size_t N)(Node value, string path, out T[N] result) {
-		static if (isSomeChar!T) {
-			expect(value, NodeID.scalar);
-			ForeachType!(T[N])[] str;
-			deserialize(value, path, str);
-			foreach (i, chr; str.byCodeUnit.enumerate(0)) {
-				enforce(i < N, new YAMLDException(value.startMark, "Static array too small to contain all elements"));
-				result[i] = chr;
-			}
-			return;
-		} else {
-			expect(value, NodeID.sequence);
-			size_t i;
-			foreach (Node newNode; value) {
-				enforce(i < N, new YAMLDException(value.startMark, "Static array too small to contain all elements"));
-				deserialize(newNode, path, result[i++]);
-			}
-			return;
-		}
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
-		if (value.type != NodeType.null_) {
-			expect(value, NodeID.sequence);
-			foreach (Node newNode; value) {
-				ElementType!T ele;
-				deserialize(newNode, path, ele);
-				result ~= ele;
-			}
-		}
-	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
-		import std.exception : enforce;
-		import std.meta : AliasSeq;
-		import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-		expect(value, NodeID.mapping);
-		foreach (member; FieldNameTuple!T) {
-			alias field = AliasSeq!(__traits(getMember, T, member));
-			static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
-				debug string newPath = path~"."~member;
-				else string newPath = path;
-				enum memberName = getMemberName!field;
-				const valueIsAbsent = memberName !in value;
-				static if ((isOptional!field || (!!(flags & DeSiryulize.optionalByDefault)) && !isRequired!field) || hasIndirections!(typeof(field))) {
-					if (!hasConvertFromFunc!(T, field) && valueIsAbsent) {
-						continue;
-					}
-				} else {
-					enforce(memberName in value, new YAMLDException(value.startMark, "Missing non-@Optional "~memberName~" in node"));
-				}
-				static if (hasConvertFromFunc!(T, field)) {
-					alias fromFunc = getConvertFromFunc!(T, field);
-					try {
-						Parameters!(fromFunc)[0] param;
-						if (!valueIsAbsent) {
-							deserialize(value[memberName], newPath, param);
-						}
-						__traits(getMember, result, member) = fromFunc(param);
-					} catch (Exception e) {
-						e.msg = "Error deserializing "~newPath~": "~e.msg;
-						throw e;
-					}
-				} else {
-					deserialize(value[memberName], newPath, __traits(getMember, result, member));
-				}
-			}
-		}
-	}
-	void deserialize(T)(Node value, string path, out T result) if (is(T == SysTime) || is(T == DateTime) || is(T == Date)) {
-		expect(value, NodeID.scalar);
-		result = value.get!SysTime.tryConvert!T(value.startMark);
-	}
-	void deserialize(Node value, string path, out Duration result) {
-		expect(value, NodeID.scalar);
-		result = value.get!string.fromISODurationString();
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isSomeChar!T) {
-		import std.array : front;
-		if (value.type != NodeType.null_) {
-			expect(value, NodeID.scalar);
-			result = cast(T)value.get!string.front;
-		}
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isSomeString!T && !canStoreUnchanged!T) {
-		string str;
-		deserialize(value, path, str);
-		result = str.tryConvert!T(value.startMark);
-	}
-	void deserialize(T)(Node value, string path, out T result) if (canStoreUnchanged!T) {
-		expect(value, NodeID.scalar);
-		if (value.tag == `tag:yaml.org,2002:str`) {
-			result = value.get!string.tryConvert!T(value.startMark);
-		} else {
-			static if (isIntegral!T) {
-				enforce(value.tag == `tag:yaml.org,2002:int`, new YAMLDException(value.startMark, "Attempted to read a float as an integer"));
-				result = value.get!T;
-			} else static if (isSomeString!T) {
-				enforce(value.tag != `tag:yaml.org,2002:bool`, new YAMLDException(value.startMark, "Attempted to read a non-string as a string"));
-				if (value.type != NodeType.null_) {
-					result = value.get!T;
-				}
-			} else {
-				result = value.get!T;
-			}
-		}
-	}
-	void deserialize(T : P*, P)(Node value, string path, out T result) {
-		result = new P;
-		deserialize(value, path, *result);
-	}
-	void deserialize(Node, string, out typeof(null)) {}
-	void deserialize(T)(Node value, string path, out T result) if (isAggregateType!T && hasDeserializationMethod!T) {
-		Parameters!(deserializationMethod!T) tmp;
-		deserialize(value, path, tmp);
-		result = deserializationMethod!T(tmp);
-	}
-	void deserialize(T)(Node value, string path, out T result) if (isAggregateType!T && hasDeserializationTemplate!T) {
-		Parameters!(T.fromSiryulType!()) tmp;
-		deserialize(value, path, tmp);
-		result = deserializationTemplate!T(tmp);
-	}
 }
 template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
 	import std.conv : text, to;
@@ -354,7 +252,7 @@ private template expectedTag(T) {
 	static if(isFloatingPoint!T) {
 		enum expectedTag = `tag:yaml.org,2002:float`;
 	}
-	static if(is(T == string)) {
+	static if(is(T : const(char)[])) {
 		enum expectedTag = `tag:yaml.org,2002:str`;
 	}
 	static if(is(T == SysTime)) {
@@ -366,7 +264,7 @@ private template canStoreUnchanged(T) {
 	enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string));
 }
 
-private T tryConvert(T, V)(V value, Mark location) {
+private T tryConvert(T, V)(V value, dyaml.Mark location) {
 	import std.conv : ConvException, to;
 	import std.format : format;
 	try {
