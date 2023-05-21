@@ -3,7 +3,7 @@ import core.time : Duration;
 private import siryul.common;
 private import std.json : JSONValue, JSONType, parseJSON, toJSON;
 private import std.range.primitives : ElementType, isInfinite, isInputRange, isOutputRange;
-private import std.traits : isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray;
+private import std.traits : isAggregateType, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, Unqual;
 private import std.typecons;
 /++
  + JSON (JavaScript Object Notation) serialization format
@@ -11,19 +11,39 @@ private import std.typecons;
  + Note that only strings are supported for associative array keys in this format.
  +/
 struct JSON {
-	private import std.meta : AliasSeq;
-	alias extensions = AliasSeq!".json";
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		T output;
 		deserialize(Node(parseJSON(data)), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
 	package static string asString(Siryulize flags, T)(T data) {
-		const json = serialize!(JSON, BitFlags!Siryulize(flags))(data);
-		return toJSON(json, true);
+		const json = serialize!Node(data, BitFlags!Siryulize(flags));
+		return toJSON(json.value, true);
 	}
 	static struct Node {
 		private JSONValue value;
+		this(T)(T value) if (canStoreUnchanged!T) {
+			this.value = JSONValue(value);
+		}
+		private this(JSONValue value) @safe pure nothrow @nogc {
+			this.value = value;
+		}
+		this(Node[] newValues) @safe pure {
+			JSONValue[] values;
+			values.reserve(newValues.length);
+			foreach (newValue; newValues) {
+				values ~= newValue.value;
+			}
+			this.value = JSONValue(values);
+		}
+		this(Node[string] newValues) @safe pure {
+			JSONValue[string] values;
+			foreach (newKey, newValue; newValues) {
+				values[newKey] = newValue.value;
+			}
+			this.value = JSONValue(values);
+		}
+		enum hasStringIndexing = false;
 		enum getMark = Nullable!Mark.init;
 		bool hasTypeConvertible(T)() const {
 			static if (is(T == typeof(null))) {
@@ -69,6 +89,9 @@ struct JSON {
 				assert(0, "Cannot represent type");
 			}
 		}
+		void opAssign(T)(T newValue) if (canStoreUnchanged!T) {
+			value = JSONValue(newValue);
+		}
 		Node opIndex(size_t index) @safe {
 			return Node(value.arrayNoRef[index]);
 		}
@@ -90,94 +113,14 @@ struct JSON {
 			}
 			return 0;
 		}
+		template canStoreUnchanged(T) {
+			import std.traits : isFloatingPoint, isIntegral;
+			enum canStoreUnchanged = isIntegral!T || is(T == string) || is(T : bool) || isFloatingPoint!T;
+		}
 	}
 }
 
-
-template serialize(Serializer : JSON, BitFlags!Siryulize flags) {
-	import std.traits : isAggregateType, Unqual;
-	private JSONValue serialize(T)(ref const T value) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
-		import std.meta : AliasSeq;
-		import std.traits : FieldNameTuple;
-		string[string] arr;
-		auto output = JSONValue(arr);
-		foreach (member; FieldNameTuple!T) {
-			alias field = AliasSeq!(__traits(getMember, T, member));
-			static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
-				if (__traits(getMember, value, member).isSkippableValue!flags) {
-					continue;
-				}
-				enum memberName = getMemberName!field;
-				static if (hasConvertToFunc!(T, field)) {
-					output[memberName] = serialize(getConvertToFunc!(T, field)(__traits(getMember, value, member)));
-				} else {
-					output[memberName] = serialize(__traits(getMember, value, member));
-				}
-			}
-		}
-		return output;
-	}
-	private JSONValue serialize(T)(ref const T value) if (isNullable!T) {
-		if (value.isNull) {
-			return serialize(null);
-		} else {
-			return serialize(value.get);
-		}
-	}
-	private JSONValue serialize(T)(ref const T value) if (isSumType!T) {
-		import std.sumtype : match;
-		return value.match!(v => serialize(v));
-	}
-	private JSONValue serialize(const typeof(null) value) {
-		return JSONValue();
-	}
-	private JSONValue serialize(T)(ref const T value) if (shouldStringify!value || is(T == enum)) {
-		import std.conv : text;
-		return JSONValue(value.text);
-	}
-	private JSONValue serialize(T)(ref const T value) if (isPointer!T) {
-		return serialize(*value);
-	}
-	private JSONValue serialize(T)(ref const T value) if (isTimeType!T) {
-		return JSONValue(value.toISOExtString());
-	}
-	private JSONValue serialize(ref const Duration value) {
-		import std.conv : text;
-		return JSONValue(value.asISO8601String().text);
-	}
-	private JSONValue serialize(T)(ref const T value) if (isSomeChar!T) {
-		return JSONValue([value]);
-	}
-	private JSONValue serialize(T)(ref const T value) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
-		import std.utf : toUTF8;
-		return JSONValue(value[].toUTF8);
-	}
-	private JSONValue serialize(T)(const T value) if (canStoreUnchanged!(Unqual!T) && !is(T == enum)) {
-		return JSONValue(value);
-	}
-	private JSONValue serialize(T)(ref T values) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
-		JSONValue[] output;
-		foreach (value; values) {
-			output ~= serialize(value);
-		}
-		return JSONValue(output);
-	}
-	private JSONValue serialize(T)(ref T values) if (isAssociativeArray!T) {
-		JSONValue[string] output;
-		foreach (key, value; values) {
-			output[key] = serialize(value);
-		}
-		return JSONValue(output);
-	}
-	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
-		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
-	}
-	private JSONValue serialize(T)(ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
-		const v = __traits(getMember, value, __traits(identifier, serializationTemplate!T));
-		return serialize(v);
-	}
-}
-private template canStoreUnchanged(T) {
-	import std.traits : isFloatingPoint, isIntegral;
-	enum canStoreUnchanged = isIntegral!T || is(T == string) || is(T == bool) || isFloatingPoint!T;
+@safe unittest {
+	import siryul.testing;
+	runTests!JSON();
 }

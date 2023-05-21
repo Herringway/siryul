@@ -1,4 +1,5 @@
 module siryul.common;
+import std.datetime : Date, DateTime, SysTime;
 import std.meta : Filter, templateAnd, templateNot, templateOr;
 import std.range : ElementType, isInputRange, isOutputRange;
 import std.traits;
@@ -204,7 +205,6 @@ package template getConvertToFunc(T, alias member) {
 }
 version(unittest) {
 	struct TimeTest {
-		import std.datetime : SysTime;
 		@CustomParser("fromJunk", "toJunk") SysTime time;
 		string nothing;
 		static SysTime fromJunk(string) {
@@ -277,10 +277,10 @@ unittest {
 	static assert(isTimeType!(immutable Date));
 	static assert(isTimeType!(immutable TimeOfDay));
 }
-bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @safe pure {
+bool isSkippableValue(T)(const scope ref T value, BitFlags!Siryulize flags) @safe pure {
 	import std.traits : hasMember, isFloatingPoint;
 	bool result = false;
-	static if (flags.omitNulls) {
+	if (flags.omitNulls) {
 		static if (hasMember!(typeof(value), "isNull")) {
 			if (value.isNull) {
 				return true;
@@ -291,7 +291,7 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 			}
 		}
 	}
-	static if (flags.omitInits) {
+	if (flags.omitInits) {
 		static if (is(typeof(T.init is null))) {
 			if (value is T.init) {
 				return true;
@@ -321,95 +321,100 @@ bool isSkippableValue(BitFlags!Siryulize flags, T)(const scope ref T value) @saf
 	enum skipInits = BitFlags!Siryulize(Siryulize.omitInits);
 	enum skipNulls = BitFlags!Siryulize(Siryulize.omitNulls);
 	enum skipNothing = BitFlags!Siryulize();
+	void runTest(T)(T value, bool[3] expected) {
+		assert(isSkippableValue(value, skipInits) == expected[0]);
+		assert(isSkippableValue(value, skipNulls) == expected[1]);
+		assert(isSkippableValue(value, skipNothing) == expected[2]);
+	}
 	const nint = Nullable!int();
-	assert(isSkippableValue!skipInits(nint));
-	assert(isSkippableValue!skipNulls(nint));
-	assert(!isSkippableValue!skipNothing(nint));
+	assert(isSkippableValue(nint, skipInits));
+	assert(isSkippableValue(nint, skipNulls));
+	assert(!isSkippableValue(nint, skipNothing));
 
 	const nint2 = Nullable!(int, 0)();
-	assert(isSkippableValue!skipInits(nint2));
-	assert(isSkippableValue!skipNulls(nint2));
-	assert(!isSkippableValue!skipNothing(nint2));
+	assert(isSkippableValue(nint2, skipInits));
+	assert(isSkippableValue(nint2, skipNulls));
+	assert(!isSkippableValue(nint2, skipNothing));
 
 	const nint3 = Nullable!(int, 100)();
-	assert(isSkippableValue!skipInits(nint3));
-	assert(isSkippableValue!skipNulls(nint3));
-	assert(!isSkippableValue!skipNothing(nint3));
+	assert(isSkippableValue(nint3, skipInits));
+	assert(isSkippableValue(nint3, skipNulls));
+	assert(!isSkippableValue(nint3, skipNothing));
 
 	const i = 0;
-	assert(isSkippableValue!skipInits(i));
-	assert(!isSkippableValue!skipNulls(i));
-	assert(!isSkippableValue!skipNothing(i));
+	assert(isSkippableValue(i, skipInits));
+	assert(!isSkippableValue(i, skipNulls));
+	assert(!isSkippableValue(i, skipNothing));
 
 	const i2 = 1;
-	assert(!isSkippableValue!skipInits(i2));
-	assert(!isSkippableValue!skipNulls(i2));
-	assert(!isSkippableValue!skipNothing(i2));
+	assert(!isSkippableValue(i2, skipInits));
+	assert(!isSkippableValue(i2, skipNulls));
+	assert(!isSkippableValue(i2, skipNothing));
 
 	const a = [];
-	assert(isSkippableValue!skipInits(a));
-	assert(isSkippableValue!skipNulls(a));
-	assert(!isSkippableValue!skipNothing(a));
+	assert(isSkippableValue(a, skipInits));
+	assert(isSkippableValue(a, skipNulls));
+	assert(!isSkippableValue(a, skipNothing));
 
 	const a2 = [1];
-	assert(!isSkippableValue!skipInits(a2));
-	assert(!isSkippableValue!skipNulls(a2));
-	assert(!isSkippableValue!skipNothing(a2));
+	assert(!isSkippableValue(a2, skipInits));
+	assert(!isSkippableValue(a2, skipNulls));
+	assert(!isSkippableValue(a2, skipNothing));
 
 	const int[1] a3;
-	assert(isSkippableValue!skipInits(a3));
-	assert(!isSkippableValue!skipNulls(a3));
-	assert(!isSkippableValue!skipNothing(a3));
+	assert(isSkippableValue(a3, skipInits));
+	assert(!isSkippableValue(a3, skipNulls));
+	assert(!isSkippableValue(a3, skipNothing));
 
 	const string[string] aa;
-	assert(isSkippableValue!skipInits(aa));
-	assert(isSkippableValue!skipNulls(aa));
-	assert(!isSkippableValue!skipNothing(aa));
+	assert(isSkippableValue(aa, skipInits));
+	assert(isSkippableValue(aa, skipNulls));
+	assert(!isSkippableValue(aa, skipNothing));
 
 	const aa2 = [1:1];
-	assert(!isSkippableValue!skipInits(aa2));
-	assert(!isSkippableValue!skipNulls(aa2));
-	assert(!isSkippableValue!skipNothing(aa2));
+	assert(!isSkippableValue(aa2, skipInits));
+	assert(!isSkippableValue(aa2, skipNulls));
+	assert(!isSkippableValue(aa2, skipNothing));
 
 	static struct AssocWrapped { int[int] a; }
 	AssocWrapped aa3; // https://issues.dlang.org/show_bug.cgi?id=13622
-	assert(isSkippableValue!skipInits(aa3));
-	assert(!isSkippableValue!skipNulls(aa3));
-	assert(!isSkippableValue!skipNothing(aa3));
+	assert(isSkippableValue(aa3, skipInits));
+	assert(!isSkippableValue(aa3, skipNulls));
+	assert(!isSkippableValue(aa3, skipNothing));
 
 	const int* p;
-	assert(isSkippableValue!skipInits(p));
-	assert(isSkippableValue!skipNulls(p));
-	assert(!isSkippableValue!skipNothing(p));
+	assert(isSkippableValue(p, skipInits));
+	assert(isSkippableValue(p, skipNulls));
+	assert(!isSkippableValue(p, skipNothing));
 
 	class X {}
 	const X x;
-	assert(isSkippableValue!skipInits(x));
-	assert(isSkippableValue!skipNulls(x));
-	assert(!isSkippableValue!skipNothing(x));
+	assert(isSkippableValue(x, skipInits));
+	assert(isSkippableValue(x, skipNulls));
+	assert(!isSkippableValue(x, skipNothing));
 
 	struct Y {
 		int a;
 	}
 	const Y y;
-	assert(isSkippableValue!skipInits(y));
-	assert(!isSkippableValue!skipNulls(y));
-	assert(!isSkippableValue!skipNothing(y));
+	assert(isSkippableValue(y, skipInits));
+	assert(!isSkippableValue(y, skipNulls));
+	assert(!isSkippableValue(y, skipNothing));
 
 	const y2 =Y(1);
-	assert(!isSkippableValue!skipInits(y2));
-	assert(!isSkippableValue!skipNulls(y2));
-	assert(!isSkippableValue!skipNothing(y2));
+	assert(!isSkippableValue(y2, skipInits));
+	assert(!isSkippableValue(y2, skipNulls));
+	assert(!isSkippableValue(y2, skipNothing));
 
 	const double f;
-	assert(isSkippableValue!skipInits(f));
-	assert(!isSkippableValue!skipNulls(f));
-	assert(!isSkippableValue!skipNothing(f));
+	assert(isSkippableValue(f, skipInits));
+	assert(!isSkippableValue(f, skipNulls));
+	assert(!isSkippableValue(f, skipNothing));
 
 	const f2 = 2.0;
-	assert(!isSkippableValue!skipInits(f2));
-	assert(!isSkippableValue!skipNulls(f2));
-	assert(!isSkippableValue!skipNothing(f2));
+	assert(!isSkippableValue(f2, skipInits));
+	assert(!isSkippableValue(f2, skipNulls));
+	assert(!isSkippableValue(f2, skipNothing));
 }
 
 package void trustedAssign(T, T2)(out T dest, T2 val) @trusted {
@@ -782,3 +787,117 @@ private void expect(T, NodeType)(NodeType node, string file = __FILE__, ulong li
 	import std.format : format;
 	enforce(node.hasTypeConvertible!T, new DeserializeException(format!"Expected %s"(T.stringof), node.getMark, file, line));
 }
+
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (is(T == struct) && !isSumType!T && !isNullable!T && !isTimeType!T && !hasSerializationMethod!T && !hasSerializationTemplate!T && !(is(T: const(Duration)))) {
+	import std.meta : AliasSeq;
+	import std.traits : FieldNameTuple;
+	EmptyMapping!Node output;
+	foreach (member; FieldNameTuple!T) {
+		alias field = AliasSeq!(__traits(getMember, T, member));
+		static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
+			if (__traits(getMember, value, member).isSkippableValue(flags)) {
+				continue;
+			}
+			enum memberName = getMemberName!field;
+			static if (hasConvertToFunc!(T, field)) {
+				output[memberName] = serialize!Node(getConvertToFunc!(T, field)(__traits(getMember, value, member)), flags);
+			} else {
+				output[memberName] = serialize!Node(__traits(getMember, value, member), flags);
+			}
+		}
+	}
+	return output.toNode!Node;
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isNullable!T) {
+	if (value.isNull) {
+		return serialize!Node(null, flags);
+	} else {
+		return serialize!Node(value.get, flags);
+	}
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isSumType!T) {
+	import std.sumtype : match;
+	return value.match!(v => serialize!Node(v, flags));
+}
+Node serialize(Node)(const typeof(null) value, BitFlags!Siryulize flags) {
+	return Node();
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (shouldStringify!value || is(T == enum)) {
+	import std.conv : text;
+	return Node(value.text);
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isPointer!T) {
+	return serialize!Node(*value, flags);
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isTimeType!T) {
+	return Node(value.toISOExtString());
+}
+Node serialize(Node)(ref const Duration value, BitFlags!Siryulize flags) {
+	import std.conv : text;
+	return Node(value.asISO8601String().text);
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isSomeChar!T) {
+	import std.utf : toUTF8;
+	return Node([value].toUTF8);
+}
+Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if ((isSomeString!T || isStaticString!T) && !is(T : string)) {
+	import std.utf : toUTF8;
+	return Node(value[].toUTF8);
+}
+Node serialize(Node, T)(const T value, BitFlags!Siryulize flags) if (Node.canStoreUnchanged!(Unqual!T) && !is(T == enum)) {
+	return Node(value);
+}
+Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
+	Node[] output;
+	foreach (value; values) {
+		output ~= serialize!Node(value, flags);
+	}
+	return Node(output);
+}
+Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isAssociativeArray!T) {
+	EmptyMapping!Node output;
+	foreach (key, value; values) {
+		output[key] = serialize!Node(value, flags);
+	}
+	return output.toNode!Node;
+}
+Node serialize(Node, T)(ref T value, BitFlags!Siryulize flags) if (isAggregateType!T && hasSerializationMethod!T) {
+	return serialize!Node(__traits(getMember, value, __traits(identifier, serializationMethod!T)), flags);
+}
+Node serialize(Node, T)(ref T value, BitFlags!Siryulize flags) if (isAggregateType!T && hasSerializationTemplate!T) {
+	const v = __traits(getMember, value, __traits(identifier, serializationTemplate!T));
+	return serialize!Node(v, flags);
+}
+
+private template EmptyMapping(Node) {
+	static if (Node.hasStringIndexing) {
+		alias EmptyMapping = Node.emptyMapping;
+	} else {
+		alias EmptyMapping = Node[string];
+	}
+}
+
+private Node toNode(Node)(EmptyMapping!Node input) {
+	static if (Node.hasStringIndexing) {
+		return input;
+	} else {
+		return Node(input);
+	}
+}
+
+/++
+ + Determines whether or not the given type is a valid (de)serializer
+ +/
+template isSiryulizer(T) {
+	debug enum isSiryulizer = true;
+	else enum isSiryulizer = __traits(compiles, () {
+		uint val = T.parseInput!(uint, DeSiryulize.none)("", "");
+		string str = T.asString!(Siryulize.none)(3);
+	});
+}
+
+///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
+enum ISO8601;
+///Use extended ISO8601 format for dates and times - YYYY-MM-DDTHH:MM:SS.FFFFFFFTZ
+///Generally more readable than standard format.
+enum ISO8601Extended;

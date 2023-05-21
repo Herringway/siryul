@@ -10,8 +10,6 @@ import std.typecons;
  + YAML (YAML Ain't Markup Language) serialization format
  +/
 struct YAML {
-	private import std.meta : AliasSeq;
-	alias extensions = AliasSeq!(".yml", ".yaml");
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		import std.conv : to;
 		import std.format : format;
@@ -34,7 +32,7 @@ struct YAML {
 		dumper.defaultCollectionStyle = CollectionStyle.block;
 		dumper.defaultScalarStyle = ScalarStyle.plain;
 		dumper.explicitStart = false;
-		dumper.dump(buf, serialize!(YAML, BitFlags!Siryulize(flags))(data));
+		dumper.dump(buf, serialize!(Node)(data, BitFlags!Siryulize(flags)).node);
 		return buf.data;
 	}
 	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow @nogc {
@@ -47,7 +45,28 @@ struct YAML {
 		return mark;
 	}
 	static struct Node {
-		private dyaml.Node node;
+		private dyaml.Node node = dyaml.Node(YAMLNull());
+		this(T)(T value) if (canStoreUnchanged!T) {
+			this.node = dyaml.Node(value);
+		}
+		this(Node[] newNodes) @safe pure {
+			dyaml.Node[] nodes;
+			nodes.reserve(newNodes.length);
+			foreach (newNode; newNodes) {
+				nodes ~= newNode.node;
+			}
+			this.node = dyaml.Node(nodes);
+		}
+		this(Node[string] newNodes) @safe pure {
+			dyaml.Node[dyaml.Node] nodes;
+			foreach (newKey, newNode; newNodes) {
+				nodes[dyaml.Node(newKey)] = newNode.node;
+			}
+			this.node = dyaml.Node(nodes);
+		}
+		private this(dyaml.Node node) @safe pure nothrow @nogc {
+			this.node = node;
+		}
 		Nullable!(siryul.common.Mark) getMark() const @safe pure nothrow {
 			return typeof(return)(convertMark(node.startMark));
 		}
@@ -111,110 +130,14 @@ struct YAML {
 			}
 			return 0;
 		}
+		template canStoreUnchanged(T) {
+			import std.traits : isFloatingPoint, isIntegral;
+			enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T : bool) || isFloatingPoint!T || is(T == string));
+		}
+		enum hasStringIndexing = false;
 	}
 }
 
-
-/++
- + Thrown on YAML serialization errors
- +/
-class YAMLSException : SerializeException {
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		super(msg, file, line);
-	}
-}
-template serialize(Serializer : YAML, BitFlags!Siryulize flags) {
-	import std.conv : text, to;
-	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
-	import std.traits : arity, FieldNameTuple, isAggregateType, isAssociativeArray, isPointer, isSomeString, isStaticArray, PointerTarget, Unqual;
-	private Node serialize(const typeof(null) value) {
-		return Node(YAMLNull());
-	}
-	private Node serialize(ref const SysTime value) {
-		return Node(value.to!SysTime, "tag:yaml.org,2002:timestamp");
-	}
-	private Node serialize(ref const TimeOfDay value) {
-		return Node(value.toISOExtString);
-	}
-	private Node serialize(ref const Duration value) {
-		return Node(value.asISO8601String.text);
-	}
-	private Node serialize(T)(auto ref const T value) if (isSomeChar!T) {
-		return serialize([value]);
-	}
-	private Node serialize(T)(auto ref const T value) if (canStoreUnchanged!T) {
-		return Node(value.to!T);
-	}
-	private Node serialize(T)(auto ref const T value) if (!canStoreUnchanged!T && (isSomeString!T || (isStaticArray!T && isSomeChar!(ElementType!T)))) {
-		import std.utf : toUTF8;
-		return serialize(value[].toUTF8().idup);
-	}
-	private Node serialize(T)(auto ref const T value) if (shouldStringify!value || is(T == enum)) {
-		return Node(value.text);
-	}
-	private Node serialize(T)(auto ref const T value) if (isAssociativeArray!T) {
-		Node[Node] output;
-		foreach (k, v; value) {
-			output[serialize(k)] = serialize(v);
-		}
-		return Node(output);
-	}
-	private Node serialize(T)(auto ref T values) if (isSimpleList!T && !isSomeChar!(ElementType!T) && !isNullable!T) {
-		Node[] output;
-		foreach (value; values) {
-			output ~= serialize(value);
-		}
-		return Node(output);
-	}
-	private Node serialize(T)(auto ref const T value) if (isPointer!T) {
-		return serialize(*value);
-	}
-	private Node serialize(T)(auto ref const T value) if (is(T == struct) && !hasSerializationMethod!T && !hasSerializationTemplate!T) {
-		static if (is(T == Date) || is(T == DateTime)) {
-			return Node(value.toISOExtString, "tag:yaml.org,2002:timestamp");
-		} else static if (isSumType!T) {
-			import std.sumtype : match;
-			return value.match!(v => serialize(v));
-		} else static if (isNullable!T) {
-			if (value.isNull) {
-				return serialize(null);
-			} else {
-				return serialize(value.get);
-			}
-		} else {
-			import std.meta : AliasSeq;
-			static string[] empty;
-			Node output = Node(empty, empty);
-			foreach (member; FieldNameTuple!T) {
-				alias field = AliasSeq!(__traits(getMember, T, member));
-				static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
-					if (__traits(getMember, value, member).isSkippableValue!flags) {
-						continue;
-					}
-					enum memberName = getMemberName!field;
-					try {
-						static if (hasConvertToFunc!(T, field)) {
-							auto val = serialize(getConvertToFunc!(T, field)(__traits(getMember, value, member)));
-							output.add(memberName, val);
-						} else {
-							output.add(memberName, serialize(__traits(getMember, value, member)));
-						}
-					} catch (Exception e) {
-						throw new YAMLSException("Error serializing: "~e.msg, e.file, e.line);
-					}
-				}
-			}
-			return output;
-		}
-	}
-	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationMethod!T) {
-		return serialize(__traits(getMember, value, __traits(identifier, serializationMethod!T)));
-	}
-	private Node serialize(T)(auto ref T value) if (isAggregateType!T && hasSerializationTemplate!T) {
-		const v = __traits(getMember, value, __traits(identifier, serializationTemplate!T));
-		return serialize(v);
-	}
-}
 private template expectedTag(T) {
 	import std.datetime.systime : SysTime;
 	import std.traits : isFloatingPoint, isIntegral;
@@ -234,7 +157,8 @@ private template expectedTag(T) {
 		enum expectedTag = `tag:yaml.org,2002:timestamp`;
 	}
 }
-private template canStoreUnchanged(T) {
-	import std.traits : isFloatingPoint, isIntegral;
-	enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T == bool) || isFloatingPoint!T || is(T == string));
+
+@safe unittest {
+	import siryul.testing;
+	runTests!YAML();
 }
