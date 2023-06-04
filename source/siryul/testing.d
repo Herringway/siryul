@@ -7,6 +7,7 @@ import std.conv;
 import std.datetime;
 import std.exception;
 import std.range;
+import std.traits;
 import std.typecons;
 
 private struct Empty {}
@@ -38,26 +39,25 @@ private alias toFormattedString = toString;
 
 private void runTest2(S, T, U)(auto ref T input, auto ref U expected) {
 	import std.format : format;
-	import std.traits : isPointer;
-	auto gotValue = input.toFormattedString!S.fromString!(U, S);
+	import std.stdio : writeln;
+	void writeValue(V)(string str, V value) {
+		static if (isPointer!V && isCopyable!(typeof(*value))) {
+			writeln(str, "\n ", *value);
+		} else {
+			writeln(str, "\n ", value);
+		}
+	}
+	debug(verbosetesting) {
+		writeln("-----");
+		writeValue("Input:", input);
+	}
+	auto gotString = input.toFormattedString!S;
+	debug(verbosetesting) writeln("Serialized:\n", gotString);
+	auto gotValue = gotString.fromString!(U, S);
 	static if (!isSumType!U) {
 		auto gotValueOmit = input.toFormattedString!(S, Siryulize.omitInits).fromString!(U, S, DeSiryulize.optionalByDefault);
 	}
-	debug(verbosetesting) {
-		import std.stdio : writeln;
-		writeln("-----");
-		static if (isPointer!T && isCopyable!(typeof(*input))) {
-			writeln("Input:\n ", *input);
-		} else {
-			writeln("Input:\n ", input);
-		}
-		writeln("Serialized:\n", input.toFormattedString!S);
-		static if (isPointer!T && isCopyable!(typeof(*input))) {
-			writeln("Output:\n ", *gotValue);
-		} else {
-			writeln("Output:\n ", gotValue);
-		}
-	}
+	debug(verbosetesting) writeValue("Output:", gotValue);
 	static if (isPointer!T && isPointer!U) {
 		assert(*gotValue == *expected, format("%s->%s->%s failed", T.stringof, S.stringof, U.stringof));
 		static if (!isSumType!U) {
