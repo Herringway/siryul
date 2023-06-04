@@ -1,0 +1,12 @@
+{
+	"name": "std_data_json",
+	"description": "std_data_json support for siryul",
+	"copyright": "Copyright © 2023, Cameron",
+	"authors": ["Cameron \"Herringway\" Ross"],
+	"license": "BSL-1.0",
+	"homepage": "https://github.com/Herringway/siryul",
+	"dependencies": {
+		"siryul": "*",
+		"std_data_json": "~>0.18.6"
+	}
+}
