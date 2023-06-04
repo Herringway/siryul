@@ -2,6 +2,7 @@ module siryul.dyaml;
 import dyaml;
 import siryul.common;
 import core.time : Duration;
+import std.datetime.systime : SysTime;
 import std.range.primitives : ElementType, isInfinite, isInputRange;
 import std.traits : isSomeChar;
 import std.typecons;
@@ -80,7 +81,6 @@ struct YAML {
 			}
 		}
 		T getType(T)() {
-			import std.datetime : SysTime;
 			static if (is(T == typeof(null))) {
 				return node.type == NodeType.null_;
 			} else static if (is(T: const(char)[])) {
@@ -139,7 +139,6 @@ struct YAML {
 }
 
 private template expectedTag(T) {
-	import std.datetime.systime : SysTime;
 	import std.traits : isFloatingPoint, isIntegral;
 	static if(isIntegral!T) {
 		enum expectedTag = `tag:yaml.org,2002:int`;
