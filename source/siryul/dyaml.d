@@ -130,6 +130,21 @@ struct YAML {
 			}
 			return 0;
 		}
+		string type() const @safe {
+			final switch (node.type) {
+				case NodeType.null_:
+				case NodeType.invalid:
+				case NodeType.merge: return "null";
+				case NodeType.boolean: return "bool";
+				case NodeType.integer: return "long";
+				case NodeType.decimal: return "real";
+				case NodeType.timestamp: return "SysTime";
+				case NodeType.string: return "string";
+				case NodeType.binary: return "ubyte[]";
+				case NodeType.mapping: return "Node[Node]";
+				case NodeType.sequence: return "Node[]";
+			}
+		}
 		template canStoreUnchanged(T) {
 			import std.traits : isFloatingPoint, isIntegral;
 			enum canStoreUnchanged = !is(T == enum) && (isIntegral!T || is(T : bool) || isFloatingPoint!T || is(T == string));

@@ -89,6 +89,19 @@ struct JSON {
 				assert(0, "Cannot represent type");
 			}
 		}
+		string type() const @safe {
+			final switch (value.type) {
+				case JSONType.null_:
+				case JSONType.true_:
+				case JSONType.false_: return "bool";
+				case JSONType.integer: return "long";
+				case JSONType.uinteger: return "ulong";
+				case JSONType.float_: return "real";
+				case JSONType.string: return "string";
+				case JSONType.array: return "Node[]";
+				case JSONType.object: return "Node[string]";
+			}
+		}
 		void opAssign(T)(T newValue) if (canStoreUnchanged!T) {
 			value = JSONValue(newValue);
 		}

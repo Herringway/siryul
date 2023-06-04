@@ -581,7 +581,7 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 	} else if (node.hasTypeConvertible!ulong) {
 		result = cast(T)node.getType!ulong();
 	} else {
-		throw new DeserializeException("Could not convert node to integral type", node.getMark);
+		throw new DeserializeException(format!"Could not convert node of type '%s' to integral type"(node.type), node.getMark);
 	}
 }
 void deserialize(NodeType)(NodeType node, out bool result, BitFlags!DeSiryulize flags) {
