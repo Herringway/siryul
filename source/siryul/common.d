@@ -891,9 +891,3 @@ template isSiryulizer(T) {
 		string str = T.asString!(Siryulize.none)(3);
 	});
 }
-
-///Use standard ISO8601 format for dates and times - YYYYMMDDTHHMMSS.FFFFFFFTZ
-enum ISO8601;
-///Use extended ISO8601 format for dates and times - YYYY-MM-DDTHH:MM:SS.FFFFFFFTZ
-///Generally more readable than standard format.
-enum ISO8601Extended;
