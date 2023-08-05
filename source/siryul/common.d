@@ -732,11 +732,12 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 		deserialize(node, tmp, flags);
 		result = deserializationTemplate!T(tmp);
 	} else static if (is(T: V[K], K, V)) {
+		import std.conv : to;
 		expect(node, Classification.mapping);
 		foreach (string k, NodeType v; node) {
 			V val;
 			deserialize(v, val, flags);
-			result[k] = val;
+			result[k.to!K] = val;
 		}
 	} else static if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
 		import std.conv : text;
@@ -859,7 +860,8 @@ Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isSimpleList
 Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isAssociativeArray!T) {
 	EmptyMapping!Node output;
 	foreach (key, value; values) {
-		output[key] = serialize!Node(value, flags);
+		string keyString = serialize!Node(key, flags).getType!string;
+		output[keyString] = serialize!Node(value, flags);
 	}
 	return output.toNode!Node;
 }

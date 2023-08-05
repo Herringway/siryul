@@ -397,4 +397,6 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest!S(constIndirectionTest);
 	immutable(StructWithIndirections)[] constIndirectionTest2 = [StructWithIndirections(['a', 'b', 'c'], [1,2,3])];
 	runTest!S(constIndirectionTest2);
+
+	runTest!S([TestEnum.something : 5]);
 }
