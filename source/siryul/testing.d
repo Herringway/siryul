@@ -389,4 +389,12 @@ void runTests(S)() if (isSiryulizer!S) {
 	static struct Nothing {}
 	runTest2!S(SkipTest(42, 13), SkipTest());
 	runTest2!S(SkipTest(42, 13), Nothing());
+	static struct StructWithIndirections {
+		char[] aString;
+		int[] someNumbers;
+	}
+	const(StructWithIndirections)[] constIndirectionTest = [StructWithIndirections(['a', 'b', 'c'], [1,2,3])];
+	runTest!S(constIndirectionTest);
+	immutable(StructWithIndirections)[] constIndirectionTest2 = [StructWithIndirections(['a', 'b', 'c'], [1,2,3])];
+	runTest!S(constIndirectionTest2);
 }

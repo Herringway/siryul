@@ -1,11 +1,11 @@
 module siryul.common;
-import std.datetime : Date, DateTime, SysTime;
+import std.datetime;
 import std.format;
-import std.meta : Filter, templateAnd, templateNot, templateOr;
-import std.range : ElementType, isInputRange, isOutputRange;
+import std.meta;
+import std.range;
 import std.traits;
-import std.typecons : BitFlags, Nullable, NullableRef;
-import std.sumtype : SumType;
+import std.typecons;
+import std.sumtype;
 import core.time;
 
 ///Serialization options
@@ -117,10 +117,13 @@ struct CustomParser {
 	///Function to be used in serialization
 	string toFunc;
 }
+private struct AsFlags_ {}
 private struct AsString_ {}
 private struct AsBinary_ {}
 private struct SerializationMethod_ {}
 private struct DeserializationMethod_ {}
+///Write enum field as combination of flags
+enum AsFlags = AsFlags_.init;
 ///Write field as string
 enum AsString = AsString_.init;
 ///Write field as binary (NYI)
@@ -567,203 +570,206 @@ enum mustSkip(alias sym) = Filter!(typeMatches!Skip_, __traits(getAttributes, sy
 
 enum shouldStringify(alias sym) = Filter!(typeMatches!AsString_, __traits(getAttributes, sym)).length == 1;
 
+enum shouldFlagify(alias sym) = Filter!(typeMatches!AsFlags_, __traits(getAttributes, sym)).length == 1;
+
 package enum Classification {
 	scalar,
 	sequence,
 	mapping,
 }
 
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isIntegral!T && !(is(T == enum))) {
-	if (node.hasTypeConvertible!(const(char)[])) {
-		result = node.getType!(const(char)[]).tryConvert!T(node.getMark);
-	} else if (node.hasTypeConvertible!long) {
-		result = cast(T)node.getType!long();
-	} else if (node.hasTypeConvertible!ulong) {
-		result = cast(T)node.getType!ulong();
-	} else {
-		throw new DeserializeException(format!"Could not convert node of type '%s' to integral type"(node.type), node.getMark);
-	}
-}
-void deserialize(NodeType)(NodeType node, out bool result, BitFlags!DeSiryulize flags) {
-	if (node.hasTypeConvertible!bool) {
-		result = node.getType!bool;
-	} else {
-		throw new DeserializeException("Could not convert node to boolean type", node.getMark);
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isSomeString!T) {
-	if (node.hasTypeConvertible!(typeof(null))) {
-		// result is already a null string
-	} else if (node.hasTypeConvertible!string) {
-		result = node.getType!string.tryConvert!T(node.getMark);
-	} else if (node.hasTypeConvertible!long) {
-		result = node.getType!long.tryConvert!T(node.getMark);
-	} else if (node.hasTypeConvertible!ulong) {
-		result = node.getType!ulong.tryConvert!T(node.getMark);
-	} else if (node.hasTypeConvertible!real) {
-		result = node.getType!real.tryConvert!T(node.getMark);
-	} else {
-		throw new DeserializeException("Could not convert node to string", node.getMark);
-	}
-}
-void deserialize(T : P*, P, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) {
-	result = new P;
-	deserialize(node, *result, flags);
-}
-
-void deserialize(NodeType)(NodeType, out typeof(null), BitFlags!DeSiryulize) {}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isNullable!T) {
-	if (node.hasTypeConvertible!(typeof(null))) {
-		result.nullify();
-	} else {
-		typeof(result.get) tmp;
-		deserialize(node, tmp, flags);
-		result = tmp;
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (is(T == struct) && !isTimeType!T && !is(T == Duration) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
-	import std.exception : enforce;
-	import std.meta : AliasSeq;
-	import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-	expect(node, Classification.mapping);
-	foreach (member; FieldNameTuple!T) {
-		alias field = AliasSeq!(__traits(getMember, T, member));
-		static if (!mustSkip!field && __traits(getProtection, field) == "public") {
-			//debug string newPath = path~"."~member;
-			//else string newPath = path;
-			const optional = isOptional!field || !!(flags & DeSiryulize.optionalByDefault);
-			enum memberName = getMemberName!field;
-			const valueIsAbsent = (memberName !in node) || (node[memberName].hasTypeConvertible!(typeof(null)));
-			if (optional && !isRequired!field && !hasConvertFromFunc!(T, field) && valueIsAbsent) {
-				continue;
-			}
-			static if (!hasIndirections!(typeof(field)) && !hasConvertFromFunc!(T, field)) {
-				enforce(memberName in node, new DeserializeException("Missing non-@Optional "~memberName~" in node", node.getMark));
-			}
-			static if (hasConvertFromFunc!(T, field)) {
-				alias fromFunc = getConvertFromFunc!(T, field);
-				Parameters!(fromFunc)[0] param;
-				if (!valueIsAbsent) {
-					deserialize(node[memberName], param, flags);
-				}
-				__traits(getMember, result, member) = fromFunc(param);
-			} else {
-				deserialize(node[memberName], __traits(getMember, result, member), flags);
-			}
+void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) {
+	static if (isSomeString!T) {
+		if (node.hasTypeConvertible!(typeof(null))) {
+			// result is already a null string
+		} else if (node.hasTypeConvertible!string) {
+			result = node.getType!string.tryConvert!T(node.getMark);
+		} else if (node.hasTypeConvertible!long) {
+			result = node.getType!long.tryConvert!T(node.getMark);
+		} else if (node.hasTypeConvertible!ulong) {
+			result = node.getType!ulong.tryConvert!T(node.getMark);
+		} else if (node.hasTypeConvertible!real) {
+			result = node.getType!real.tryConvert!T(node.getMark);
+		} else {
+			throw new DeserializeException("Could not convert node to string", node.getMark);
 		}
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isSumType!T) {
-	static foreach (Type; T.Types) {
-		try {
-			Type tmp;
-			deserialize(node, tmp, flags);
-			trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
-			return;
-		} catch (DeserializeException e) {}
-	}
-	throw new DeserializeException("No matching types", node.getMark);
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (is(T == enum)) {
-	import std.traits : OriginalType;
-	if (node.hasTypeConvertible!string) {
-		result = node.getType!string.tryConvert!T(node.getMark);
-	} else {
-		OriginalType!T tmp;
-		deserialize(node, tmp, flags);
-		result = tmp.tryConvert!T(node.getMark);
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isTimeType!T) {
-	import std.datetime : SysTime;
-	if (node.hasTypeConvertible!SysTime) {
-		result = cast(T)node.getType!SysTime();
-	} else if (node.hasTypeConvertible!string) {
-		result = T.fromISOExtString(node.getType!string);
-	} else {
-		throw new DeserializeException("Could not convert node to time type", node.getMark);
-	}
-}
-void deserialize(NodeType)(NodeType node, out Duration result, BitFlags!DeSiryulize flags) {
-	if (node.hasTypeConvertible!Duration) {
-		result = node.getType!Duration();
-	} else if (node.hasTypeConvertible!string) {
-		result = node.getType!string.fromISODurationString;
-	} else {
-		throw new DeserializeException("Could not convert node to duration type", node.getMark);
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isFloatingPoint!T) {
-	if (node.hasTypeConvertible!real) {
-		result = node.getType!real();
-	} else if (node.hasTypeConvertible!long) {
-		result = node.getType!long.tryConvert!T(node.getMark);
-	} else if (node.hasTypeConvertible!ulong) {
-		result = node.getType!ulong.tryConvert!T(node.getMark);
-	} else {
-		result = node.getType!string.tryConvert!T(node.getMark);
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
-	import std.conv : text;
-	if (node.hasClass(Classification.sequence)) {
-		result = new T(node.length);
-		foreach (idx, ref element; result) {
-			//debug string newPath = path ~ "["~idx.text~"]";
-			//else string newPath = path;
-			deserialize(node[idx], element, flags);
+	} else static if (is(T == Duration)) {
+		if (node.hasTypeConvertible!Duration) {
+			result = node.getType!Duration();
+		} else if (node.hasTypeConvertible!string) {
+			result = node.getType!string.fromISODurationString;
+		} else {
+			throw new DeserializeException("Could not convert node to duration type", node.getMark);
 		}
-	} else {
-		throw new DeserializeException("Could not parse node as array", node.getMark);
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isStaticArray!T) {
-	import std.conv : text;
-	import std.traits : ForeachType, isSomeChar;
-	static if (isSomeChar!(ElementType!T)) {
-		import std.range : enumerate;
-		import std.utf : byCodeUnit;
-		expect!(const(char)[])(node);
-		string str;
-		deserialize(node, str, flags);
-		foreach (i, ref chr; result) {
-			chr = str[i];
+	} else static if (is(T == bool)) {
+		if (node.hasTypeConvertible!bool) {
+			result = node.getType!bool;
+		} else {
+			throw new DeserializeException("Could not convert node to boolean type", node.getMark);
 		}
-	} else {
+	} else static if (is(T == typeof(null))) {
+		// theres' nothing to do here
+	} else static if (is(T == struct) && !isTimeType!T && !is(T == Duration) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
 		import std.exception : enforce;
-		expect(node, Classification.sequence);
-		enforce(node.length == T.length, new DeserializeException("Static array length mismatch", node.getMark));
-		foreach (idx, ref element; result) {
-			//debug string newPath = path ~ "["~i.text~"]";
-			//else string newPath = path;
-			deserialize(node[idx], element, flags);
+		import std.meta : AliasSeq;
+		import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
+		expect(node, Classification.mapping);
+		foreach (member; FieldNameTuple!T) {
+			alias field = AliasSeq!(__traits(getMember, T, member));
+			static if (!mustSkip!field && __traits(getProtection, field) == "public") {
+				const optional = isOptional!field || !!(flags & DeSiryulize.optionalByDefault);
+				enum memberName = getMemberName!field;
+				const valueIsAbsent = (memberName !in node) || (node[memberName].hasTypeConvertible!(typeof(null)));
+				if (optional && !isRequired!field && !hasConvertFromFunc!(T, field) && valueIsAbsent) {
+					continue;
+				}
+				static if (!hasIndirections!(typeof(field)) && !hasConvertFromFunc!(T, field)) {
+					enforce(memberName in node, new DeserializeException("Missing non-@Optional "~memberName~" in node", node.getMark));
+				}
+				static if (hasConvertFromFunc!(T, field)) {
+					alias fromFunc = getConvertFromFunc!(T, field);
+					Parameters!(fromFunc)[0] param;
+					if (!valueIsAbsent) {
+						deserialize(node[memberName], param, flags);
+					}
+					__traits(getMember, result, member) = fromFunc(param);
+				} else {
+					deserialize(node[memberName], __traits(getMember, result, member), flags);
+				}
+			}
 		}
+	} else static if (is(T: P*, P)) {
+		result = new P;
+		deserialize(node, *result, flags);
+	} else static if (isIntegral!T && !(is(T == enum))) {
+		if (node.hasTypeConvertible!(const(char)[])) {
+			result = node.getType!(const(char)[]).tryConvert!T(node.getMark);
+		} else if (node.hasTypeConvertible!long) {
+			result = cast(T)node.getType!long();
+		} else if (node.hasTypeConvertible!ulong) {
+			result = cast(T)node.getType!ulong();
+		} else {
+			throw new DeserializeException(format!"Could not convert node of type '%s' to integral type"(node.type), node.getMark);
+		}
+	} else static if (isNullable!T) {
+		if (node.hasTypeConvertible!(typeof(null))) {
+			result.nullify();
+		} else {
+			typeof(result.get) tmp;
+			deserialize(node, tmp, flags);
+			result = tmp;
+		}
+	} else static if (is(T == enum)) {
+		import std.traits : OriginalType;
+		if (node.hasTypeConvertible!string) {
+			result = node.getType!string.tryConvert!T(node.getMark);
+		} else {
+			OriginalType!T tmp;
+			deserialize(node, tmp, flags);
+			result = tmp.tryConvert!T(node.getMark);
+		}
+	} else static if (isSumType!T) {
+		static foreach (Type; T.Types) {
+			try {
+				Type tmp;
+				deserialize(node, tmp, flags);
+				trustedAssign(result, tmp); //result has not been initialized yet, so this is safe
+				return;
+			} catch (DeserializeException e) {}
+		}
+		throw new DeserializeException("No matching types", node.getMark);
+	} else static if (isTimeType!T) {
+		import std.datetime : SysTime;
+		if (node.hasTypeConvertible!SysTime) {
+			result = cast(T)node.getType!SysTime();
+		} else if (node.hasTypeConvertible!string) {
+			result = T.fromISOExtString(node.getType!string);
+		} else {
+			throw new DeserializeException("Could not convert node to time type", node.getMark);
+		}
+	} else static if (isFloatingPoint!T) {
+		if (node.hasTypeConvertible!real) {
+			result = node.getType!real();
+		} else if (node.hasTypeConvertible!long) {
+			result = node.getType!long.tryConvert!T(node.getMark);
+		} else if (node.hasTypeConvertible!ulong) {
+			result = node.getType!ulong.tryConvert!T(node.getMark);
+		} else {
+			result = node.getType!string.tryConvert!T(node.getMark);
+		}
+	} else static if (isStaticArray!T) {
+		import std.conv : text;
+		import std.traits : ForeachType, isSomeChar;
+		static if (isSomeChar!(ElementType!T)) {
+			import std.range : enumerate;
+			import std.utf : byCodeUnit;
+			expect!(const(char)[])(node);
+			string str;
+			deserialize(node, str, flags);
+			foreach (i, ref chr; result) {
+				chr = str[i];
+			}
+		} else {
+			import std.exception : enforce;
+			expect(node, Classification.sequence);
+			enforce(node.length == T.length, new DeserializeException("Static array length mismatch", node.getMark));
+			foreach (idx, ref element; result) {
+				deserialize(node[idx], element, flags);
+			}
+		}
+	} else static if (isSomeChar!T) {
+		import std.array : front;
+		if (!node.hasTypeConvertible!(typeof(null))) {
+			expect(node, Classification.scalar);
+			result = cast(T)node.getType!string.front;
+		}
+	} else static if (isAggregateType!T && hasDeserializationMethod!T) {
+		Parameters!(deserializationMethod!T) tmp;
+		deserialize(node, tmp, flags);
+		result = deserializationMethod!T(tmp);
+	} else static if (isAggregateType!T && hasDeserializationTemplate!T) {
+		Parameters!(T.fromSiryulType!()) tmp;
+		deserialize(node, tmp, flags);
+		result = deserializationTemplate!T(tmp);
+	} else static if (is(T: V[K], K, V)) {
+		expect(node, Classification.mapping);
+		foreach (string k, NodeType v; node) {
+			V val;
+			deserialize(v, val, flags);
+			result[k] = val;
+		}
+	} else static if (isOutputRange!(T, ElementType!T) && !isSomeString!T && !isNullable!T) {
+		import std.conv : text;
+		if (node.hasClass(Classification.sequence)) {
+			result = new T(node.length);
+			foreach (idx, ref element; result) {
+				deserialize(node[idx], element, flags);
+			}
+		} else {
+			throw new DeserializeException("Could not parse node as array", node.getMark);
+		}
+	} else static if (isDynamicArray!T && !is(ElementType!T == Unqual!(ElementType!T))) {
+		import std.conv : text;
+		if (node.hasClass(Classification.sequence)) {
+			foreach (idx; 0 .. node.length) {
+				Unqual!(ElementType!T) element;
+				deserialize(node[idx], element, flags);
+				static if (is(immutable Unqual!(ElementType!T) == ElementType!T)) {
+					// safe as long as we don't keep any references around, and we don't
+					static void safeAppend(ref T array, Unqual!(ElementType!T) element) @trusted {
+						array ~= cast(immutable)element;
+					}
+					safeAppend(result, element);
+				} else {
+					result ~= element;
+				}
+			}
+		} else {
+			throw new DeserializeException("Could not parse node as array", node.getMark);
+		}
+	} else {
+		static assert(0, "No matching type for ", T);
 	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isSomeChar!T) {
-	import std.array : front;
-	if (!node.hasTypeConvertible!(typeof(null))) {
-		expect(node, Classification.scalar);
-		result = cast(T)node.getType!string.front;
-	}
-}
-void deserialize(V, K, NodeType)(NodeType node, out V[K] result, BitFlags!DeSiryulize flags) {
-	expect(node, Classification.mapping);
-	foreach (string k, NodeType v; node) {
-		V val;
-		deserialize(v, val, flags);
-		result[k] = val;
-	}
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isAggregateType!T && hasDeserializationMethod!T) {
-	Parameters!(deserializationMethod!T) tmp;
-	deserialize(node, tmp, flags);
-	result = deserializationMethod!T(tmp);
-}
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) if (isAggregateType!T && hasDeserializationTemplate!T) {
-	Parameters!(T.fromSiryulType!()) tmp;
-	deserialize(node, tmp, flags);
-	result = deserializationTemplate!T(tmp);
 }
 private T tryConvert(T, V)(V value, Nullable!Mark mark) {
 	import std.conv : ConvException, to;
