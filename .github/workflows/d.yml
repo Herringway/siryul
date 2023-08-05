@@ -23,6 +23,7 @@ jobs:
     - name: 'Test'
       run: |
         dub test
+        dub test :std_data_json
   coverage:
     runs-on: ubuntu-latest
     steps:
@@ -39,5 +40,6 @@ jobs:
         COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       run: |
         dub test -b unittest-cov
+        dub test -b unittest-cov :std_data_json
         dub fetch doveralls
         dub run doveralls
