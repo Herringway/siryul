@@ -131,15 +131,7 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest2(TestEnum.something, TestEnum.something);
 	runTest2(TestEnum.something, "something");
 
-	auto result = TestNull().toFormattedString!S.fromString!(TestNull, S);
-
-	assert(result.notNull == 0);
-	assert(result.aString == "");
-	assert(result.emptyArray == []);
-	assert(result.aNullable.isNull());
-	assert(result.anotherNullable.isNull());
-	assert(result.noDate.isNull());
-	assert(result.noEnum.isNull());
+	runTest(TestNull());
 	auto nullableTest2 = TestNull(1, "a");
 	nullableTest2.aNullable = 3;
 	nullableTest2.anotherNullable = 4;
@@ -382,9 +374,8 @@ void runTests(S)() if (isSiryulizer!S) {
 		@Skip int defaultValue = 75;
 		@Skip SkipTest* unhandled;
 	}
-	static struct Nothing {}
 	runTest2(SkipTest(42, 13), SkipTest());
-	runTest2(SkipTest(42, 13), Nothing());
+	runTest2(SkipTest(42, 13), Empty());
 	static struct StructWithIndirections {
 		char[] aString;
 		int[] someNumbers;
