@@ -28,10 +28,6 @@ private struct TestNull {
 		import std.format : formattedWrite;
 		formattedWrite!"TestNull(%s, %s, %s, %s, %s, %s, %s)"(sink, notNull, aString, emptyArray, aNullable, anotherNullable, noDate, noEnum);
 	}
-	void foo() {
-		NullSink s;
-		toString(s);
-	}
 }
 private auto sampleTime = SysTime(DateTime(2015, 10, 7, 15, 4, 46), UTC());
 
