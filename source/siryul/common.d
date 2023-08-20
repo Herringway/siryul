@@ -623,7 +623,7 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 				if (optional && !isRequired!field && !hasConvertFromFunc!(T, field) && valueIsAbsent) {
 					continue;
 				}
-				static if (!hasIndirections!(typeof(field)) && !hasConvertFromFunc!(T, field)) {
+				static if (!hasConvertFromFunc!(T, field)) {
 					enforce(memberName in node, new DeserializeException("Missing non-@Optional "~memberName~" in node", node.getMark));
 				}
 				static if (hasConvertFromFunc!(T, field)) {

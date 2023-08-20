@@ -376,6 +376,7 @@ void runTests(S)() if (isSiryulizer!S) {
 	}
 	runTest2(SkipTest(42, 13), SkipTest());
 	runTest2(SkipTest(42, 13), Empty());
+	runTest2Fail!Test2(Empty());
 	static struct StructWithIndirections {
 		char[] aString;
 		int[] someNumbers;
