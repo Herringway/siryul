@@ -37,54 +37,54 @@ private auto sampleTime = SysTime(DateTime(2015, 10, 7, 15, 4, 46), UTC());
 
 private alias toFormattedString = toString;
 
-private void runTest2(S, T, U)(auto ref T input, auto ref U expected) {
-	import std.format : format;
-	import std.stdio : writeln;
-	void writeValue(V)(string str, V value) {
-		static if (isPointer!V && isCopyable!(typeof(*value))) {
-			writeln(str, "\n ", *value);
-		} else {
-			writeln(str, "\n ", value);
-		}
-	}
-	debug(verbosetesting) {
-		writeln("-----");
-		writeValue("Input:", input);
-	}
-	auto gotString = input.toFormattedString!S;
-	debug(verbosetesting) writeln("Serialized:\n", gotString);
-	auto gotValue = gotString.fromString!(U, S);
-	static if (!isSumType!U) {
-		auto gotValueOmit = input.toFormattedString!(S, Siryulize.omitInits).fromString!(U, S, DeSiryulize.optionalByDefault);
-	}
-	debug(verbosetesting) writeValue("Output:", gotValue);
-	static if (isPointer!T && isPointer!U) {
-		assert(*gotValue == *expected, format("%s->%s->%s failed", T.stringof, S.stringof, U.stringof));
-		static if (!isSumType!U) {
-			assert(*gotValueOmit == *expected, format("%s->%s->%s failed", T.stringof, S.stringof, U.stringof));
-		}
-	} else {
-		auto vals = format("expected %s, got %s", expected, gotValue);
-		assert(gotValue == expected, format("%s->%s->%s failed, %s", T.stringof, S.stringof, U.stringof, vals));
-		static if (!isSumType!U) {
-			auto valsOmit = format("expected %s, got %s", expected, gotValueOmit);
-			assert(gotValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, S.stringof, U.stringof, valsOmit));
-		}
-	}
-}
-private void runTest2Fail(S, T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
-	assertThrown(value.toFormattedString!S.fromString!(T, S), "Expected "~S.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
-}
-private void runTest(S, T)(auto ref T expected) {
-	runTest2!S(expected, expected);
-}
-private void runTestFail(S, T)(auto ref T expected) {
-	runTest2Fail!(S, T)(expected);
-}
 void runTests(S)() if (isSiryulizer!S) {
 	import std.algorithm : filter;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.sumtype : SumType;
+	static void runTest2(T, U)(auto ref T input, auto ref U expected) {
+		import std.format : format;
+		import std.stdio : writeln;
+		void writeValue(V)(string str, V value) {
+			static if (isPointer!V && isCopyable!(typeof(*value))) {
+				writeln(str, "\n ", *value);
+			} else {
+				writeln(str, "\n ", value);
+			}
+		}
+		debug(verbosetesting) {
+			writeln("-----");
+			writeValue("Input:", input);
+		}
+		auto gotString = input.toFormattedString!S;
+		debug(verbosetesting) writeln("Serialized:\n", gotString);
+		auto gotValue = gotString.fromString!(U, S);
+		static if (!isSumType!U) {
+			auto gotValueOmit = input.toFormattedString!(S, Siryulize.omitInits).fromString!(U, S, DeSiryulize.optionalByDefault);
+		}
+		debug(verbosetesting) writeValue("Output:", gotValue);
+		static if (isPointer!T && isPointer!U) {
+			assert(*gotValue == *expected, format("%s->%s->%s failed", T.stringof, S.stringof, U.stringof));
+			static if (!isSumType!U) {
+				assert(*gotValueOmit == *expected, format("%s->%s->%s failed", T.stringof, S.stringof, U.stringof));
+			}
+		} else {
+			auto vals = format("expected %s, got %s", expected, gotValue);
+			assert(gotValue == expected, format("%s->%s->%s failed, %s", T.stringof, S.stringof, U.stringof, vals));
+			static if (!isSumType!U) {
+				auto valsOmit = format("expected %s, got %s", expected, gotValueOmit);
+				assert(gotValueOmit == expected, format("%s->%s->%s failed, %s", T.stringof, S.stringof, U.stringof, valsOmit));
+			}
+		}
+	}
+	static void runTest2Fail(T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
+		assertThrown(value.toFormattedString!S.fromString!(T, S), "Expected "~S.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
+	}
+	static void runTest(T)(auto ref T expected) {
+		runTest2(expected, expected);
+	}
+	static void runTestFail(T)(auto ref T expected) {
+		runTest2Fail!T(expected);
+	}
 	struct Test {
 		string a;
 		uint b;
@@ -96,17 +96,17 @@ void runTests(S)() if (isSiryulizer!S) {
 		double h;
 		char i;
 	}
-	runTest!S(0);
-	runTest!S(-100);
-	runTest!S(ulong.max);
-	runTest!S(long.max);
-	//runTest!S(long.min);
+	runTest(0);
+	runTest(-100);
+	runTest(ulong.max);
+	runTest(long.max);
+	//runTest(long.min);
 
 	auto testInstance = Test("beep", 2, 4, ["derp", "blorp"], ["one":1, "two":3], false, ["Test2":Test2("test")], 4.5, 'g');
 
-	runTest!S(testInstance);
-	runTest!S(testInstance.d);
-	runTest!S(testInstance.g);
+	runTest(testInstance);
+	runTest(testInstance.d);
+	runTest(testInstance.g);
 	struct StringCharTest {
 		char a;
 		wchar b;
@@ -115,25 +115,25 @@ void runTests(S)() if (isSiryulizer!S) {
 		wstring e;
 		dstring f;
 	}
-	runTest!S(StringCharTest('a', '‽', '\U00010300', "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ"));
+	runTest(StringCharTest('a', '‽', '\U00010300', "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ", "↑↑↓↓←→←→ⒷⒶ"));
 
 	int[4] staticArray = [0, 1, 2, 3];
-	runTest!S(staticArray);
+	runTest(staticArray);
 
-	runTest!S(Nullable!int(4));
-	runTest2!S(Nullable!int(), null);
-	runTest!S(TimeOfDay(1, 1, 1));
-	runTest!S(Date(2000, 1, 1));
-	runTest!S(DateTime(2000, 1, 1, 1, 1, 1));
-	runTest!S(SysTime(DateTime(2000, 1, 1), UTC()));
+	runTest(Nullable!int(4));
+	runTest2(Nullable!int(), null);
+	runTest(TimeOfDay(1, 1, 1));
+	runTest(Date(2000, 1, 1));
+	runTest(DateTime(2000, 1, 1, 1, 1, 1));
+	runTest(SysTime(DateTime(2000, 1, 1), UTC()));
 
-	runTest2!S([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
+	runTest2([0,1,2,3,4].filter!((a) => a%2 != 1), [0, 2, 4]);
 
 
-	runTest2!S(3, TestEnum.wont);
+	runTest2(3, TestEnum.wont);
 
-	runTest2!S(TestEnum.something, TestEnum.something);
-	runTest2!S(TestEnum.something, "something");
+	runTest2(TestEnum.something, TestEnum.something);
+	runTest2(TestEnum.something, "something");
 
 	auto result = TestNull().toFormattedString!S.fromString!(TestNull, S);
 
@@ -149,7 +149,7 @@ void runTests(S)() if (isSiryulizer!S) {
 	nullableTest2.anotherNullable = 4;
 	nullableTest2.noDate = SysTime(DateTime(2000, 1, 1), UTC());
 	nullableTest2.noEnum = TestEnum.ya;
-	runTest!S(nullableTest2);
+	runTest(nullableTest2);
 
 	struct SiryulizeAsTest {
 		@SiryulizeAs("word") string something;
@@ -157,31 +157,31 @@ void runTests(S)() if (isSiryulizer!S) {
 	struct SiryulizeAsTest2 {
 		string word;
 	}
-	runTest!S(SiryulizeAsTest("a"));
-	runTest2!S(SiryulizeAsTest("a"), SiryulizeAsTest2("a"));
+	runTest(SiryulizeAsTest("a"));
+	runTest2(SiryulizeAsTest("a"), SiryulizeAsTest2("a"));
 
 	struct TestNull2 {
 		@Optional @SiryulizeAs("v") Nullable!bool value;
 	}
 	auto testval = TestNull2();
 	testval.value = true;
-	runTest!S(testval);
+	runTest(testval);
 	testval.value = false;
-	runTest!S(testval);
+	runTest(testval);
 	assert(TestNull2().toFormattedString!S.fromString!(TestNull2, S).value.isNull);
 	assert(Empty().toFormattedString!S.fromString!(TestNull2, S).value.isNull);
 
-	runTest2Fail!(S, bool)("b");
-	runTest2!S(Nullable!string.init, wstring.init);
-	runTest2!S(Nullable!char.init, wchar.init);
+	runTest2Fail!bool("b");
+	runTest2(Nullable!string.init, wstring.init);
+	runTest2(Nullable!char.init, wchar.init);
 
 	//Autoconversion tests
 	//string <-> int
-	runTest2!S("3", 3);
-	runTest2!S(3, "3");
+	runTest2("3", 3);
+	runTest2(3, "3");
 	//string <-> float
-	runTest2!S("3.0", 3.0);
-	runTest2!S(3.0, "3");
+	runTest2("3.0", 3.0);
+	runTest2(3.0, "3");
 
 	//Custom parser
 	struct TimeTest {
@@ -196,55 +196,55 @@ void runTests(S)() if (isSiryulizer!S) {
 	struct TimeTestString {
 		string time;
 	}
-	runTest2!S(TimeTest(sampleTime), TimeTestString("this has nothing to do with time."));
-	runTest2!S(TimeTestString("this has nothing to do with time."), TimeTest(sampleTime));
+	runTest2(TimeTest(sampleTime), TimeTestString("this has nothing to do with time."));
+	runTest2(TimeTestString("this has nothing to do with time."), TimeTest(sampleTime));
 
 	union Unhandleable { //Unions are too dangerous to handle automatically
 		int a;
 		char[4] b;
 	}
-	assert(!__traits(compiles, runTest!S(Unhandleable())));
+	assert(!__traits(compiles, runTest(Unhandleable())));
 
 	import std.typecons : Flag;
-	runTest2!S(true, Flag!"Yep".yes);
+	runTest2(true, Flag!"Yep".yes);
 
 	import std.utf : toUTF16, toUTF32;
 	enum testStr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 	enum testStrD = testStr.toUTF16;
 	enum testStrW = testStr.toUTF32;
 	char[32] testChr = testStr;
-	runTest2!S(testChr, testStr);
-	runTest2!S(testStr, testChr);
+	runTest2(testChr, testStr);
+	runTest2(testStr, testChr);
 	dchar[32] testChr2 = testStr;
-	runTest2!S(testChr2, testStrD);
-	runTest2!S(testStrD, testChr2);
+	runTest2(testChr2, testStrD);
+	runTest2(testStrD, testChr2);
 	wchar[32] testChr3 = testStr;
-	runTest2!S(testChr3, testStrW);
-	runTest2!S(testStrW, testChr3);
+	runTest2(testChr3, testStrW);
+	runTest2(testStrW, testChr3);
 
 	//int -> float[] array doesn't even make sense, should be rejected
-	runTest2Fail!(S, float[])(3);
+	runTest2Fail!(float[])(3);
 	//Precision loss should be rejected by default
-	runTest2Fail!(S, int)(3.5);
+	runTest2Fail!int(3.5);
 	//bool -> string???
-	runTest2Fail!(S, string)(true);
+	runTest2Fail!string(true);
 	//string -> bool???
-	runTest2Fail!(S, bool)("nah");
+	runTest2Fail!bool("nah");
 
 	struct PrivateTest {
 		private uint x;
 		bool y;
 	}
 
-	runTest!S(PrivateTest(0,true));
+	runTest(PrivateTest(0,true));
 
 	struct StructPtr {
 		ubyte[100] bytes;
 	}
 	StructPtr* structPtr = new StructPtr;
-	runTest!S(structPtr);
+	runTest(structPtr);
 	structPtr.bytes[0] = 1;
-	runTest!S(structPtr);
+	runTest(structPtr);
 
 	static struct CustomSerializer {
 		bool x;
@@ -257,8 +257,8 @@ void runTests(S)() if (isSiryulizer!S) {
 			return CustomSerializer(!input);
 		}
 	}
-	runTest2!S(CustomSerializer(true), false);
-	runTest2!S(false, CustomSerializer(true));
+	runTest2(CustomSerializer(true), false);
+	runTest2(false, CustomSerializer(true));
 
 	static struct CustomSerializer2 {
 		bool x;
@@ -272,8 +272,8 @@ void runTests(S)() if (isSiryulizer!S) {
 	static struct SimpleWrapper {
 		bool x;
 	}
-	runTest2!S(CustomSerializer2(true), SimpleWrapper(false));
-	runTest2!S(SimpleWrapper(false), CustomSerializer2(true));
+	runTest2(CustomSerializer2(true), SimpleWrapper(false));
+	runTest2(SimpleWrapper(false), CustomSerializer2(true));
 
 	static union SerializableUnion {
 		bool x;
@@ -287,8 +287,8 @@ void runTests(S)() if (isSiryulizer!S) {
 			return SerializableUnion(!input);
 		}
 	}
-	runTest2!S(SerializableUnion(true), false);
-	runTest2!S(false, SerializableUnion(true));
+	runTest2(SerializableUnion(true), false);
+	runTest2(false, SerializableUnion(true));
 
 	static class SerializableClass {
 		bool x;
@@ -313,8 +313,8 @@ void runTests(S)() if (isSiryulizer!S) {
 		alias opEquals = Object.opEquals;
 		bool opEquals(SerializableClass c) @safe { return c.x == x; }
 	}
-	runTest2!S(new SerializableClass(true), false);
-	runTest2!S(false, new SerializableClass(true));
+	runTest2(new SerializableClass(true), false);
+	runTest2(false, new SerializableClass(true));
 
 	static struct RequiredTest {
 		@Required bool x;
@@ -338,11 +338,11 @@ void runTests(S)() if (isSiryulizer!S) {
 	Multiple a = SumTestA(20, "hi");
 	Multiple b = SumTestB(true, 123.0);
 	Multiple c;
-	runTest!S(a);
-	runTest!S(b);
-	runTest!S(c);
-	runTest2!S(SumTestA(20, "hi"), a);
-	runTest2!S(SumTestB(true, 123.0), b);
+	runTest(a);
+	runTest(b);
+	runTest(c);
+	runTest2(SumTestA(20, "hi"), a);
+	runTest2(SumTestB(true, 123.0), b);
 	static struct SumTest2 {
 		SumType!(double, string) value;
 		this(string str) {
@@ -355,15 +355,15 @@ void runTests(S)() if (isSiryulizer!S) {
 	static struct SumTest2Alt {
 		double value;
 	}
-	runTest!S(SumTest2("hello"));
-	runTest!S(SumTest2(2.0));
-	runTest2!S(SumTest2(2.0), SumTest2Alt(2.0));
+	runTest(SumTest2("hello"));
+	runTest(SumTest2(2.0));
+	runTest2(SumTest2(2.0), SumTest2Alt(2.0));
 	static struct LargeStruct {
 		@disable this(this);
 		uint[0x10000] largeData;
 	}
 	auto largeVal = new LargeStruct;
-	runTest!S(largeVal);
+	runTest(largeVal);
 
 	static struct NewHelper {
 		bool val;
@@ -374,29 +374,29 @@ void runTests(S)() if (isSiryulizer!S) {
 			return NewHelper(!!val);
 		}
 	}
-	runTest2!S(NewHelper(true), 1);
-	runTest2!S(NewHelper(false), 0);
-	runTest2!S(1, NewHelper(true));
-	runTest2!S(0, NewHelper(false));
+	runTest2(NewHelper(true), 1);
+	runTest2(NewHelper(false), 0);
+	runTest2(1, NewHelper(true));
+	runTest2(0, NewHelper(false));
 	const systime = sampleTime;
-	runTest2!S(systime, sampleTime);
-	runTest!S(1.hours);
+	runTest2(systime, sampleTime);
+	runTest(1.hours);
 	static struct SkipTest {
 		@Skip int val;
 		@Skip int defaultValue = 75;
 		@Skip SkipTest* unhandled;
 	}
 	static struct Nothing {}
-	runTest2!S(SkipTest(42, 13), SkipTest());
-	runTest2!S(SkipTest(42, 13), Nothing());
+	runTest2(SkipTest(42, 13), SkipTest());
+	runTest2(SkipTest(42, 13), Nothing());
 	static struct StructWithIndirections {
 		char[] aString;
 		int[] someNumbers;
 	}
 	const(StructWithIndirections)[] constIndirectionTest = [StructWithIndirections(['a', 'b', 'c'], [1,2,3])];
-	runTest!S(constIndirectionTest);
+	runTest(constIndirectionTest);
 	immutable(StructWithIndirections)[] constIndirectionTest2 = [StructWithIndirections(['a', 'b', 'c'], [1,2,3])];
-	runTest!S(constIndirectionTest2);
+	runTest(constIndirectionTest2);
 
-	runTest!S([TestEnum.something : 5]);
+	runTest([TestEnum.something : 5]);
 }
