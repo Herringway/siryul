@@ -15,9 +15,11 @@ import stdx.data.json;
  + Note that only strings are supported for associative array keys in this format.
  +/
 struct StdDataJSON {
-	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
+	package static T parseInput(T, DeSiryulize flags, U)(U data, string name) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		T output;
-		deserialize(Node(toJSONValue(data)), output, BitFlags!DeSiryulize(flags));
+		auto json = toJSONValue(data);
+		json.location.file = name;
+		deserialize(Node(json), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -48,14 +50,8 @@ struct StdDataJSON {
 			this.value = JSONValue(values);
 		}
 		enum hasStringIndexing = false;
-		Nullable!Mark getMark() const @safe pure nothrow {
-			Nullable!Mark result = Mark();
-			with (result.get) {
-				filename = value.location.file;
-				line = value.location.line;
-				column = value.location.column;
-			}
-			return result;
+		Mark getMark() const @safe pure nothrow {
+			return Mark(value.location.file, value.location.line, value.location.column);
 		}
 		bool hasTypeConvertible(T)() const {
 			static if (is(T == typeof(null))) {

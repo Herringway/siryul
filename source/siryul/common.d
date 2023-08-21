@@ -43,29 +43,49 @@ class DeserializeException : SiryulException {
 	package this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(msg, file, line);
 	}
-	package this(Mark mark, string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	package this(string msg, Mark mark, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		import std.conv : text;
 		this.mark = mark;
 		try {
 			super(text(mark, ": ",msg), file, line);
 		} catch (Exception) { assert(0); }
 	}
-	package this(string msg, Nullable!Mark mark, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
-		if (mark.isNull) {
-			this(msg, file, line);
-		} else {
-			this(mark.get, msg, file, line);
+}
+
+struct Mark {
+	string name = "<unknown>";
+	deprecated("Use name instead") alias filename = name;
+	Nullable!ulong line;
+	Nullable!ulong column;
+	this(string name) @safe pure nothrow {
+		this.name = name;
+	}
+	this(string name, ulong line) @safe pure nothrow {
+		this.line = line;
+		this(name);
+	}
+	this(string name, ulong line, ulong column) @safe pure nothrow {
+		this(name, line);
+		this.column = column;
+	}
+	void toString(T)(T sink) const if (isOutputRange!(T, char[])) {
+		put(sink, name);
+		if (!line.isNull) {
+			sink.formattedWrite!" (line %s"(line.get);
+			if (!column.isNull) {
+				sink.formattedWrite!", column %s"(column.get);
+			}
+			put(sink, ")");
 		}
 	}
 }
 
-struct Mark {
-	string filename = "<unknown>";
-	ulong line;
-	ulong column;
-	void toString(T)(T sink) const if (isOutputRange!(T, char[])) {
-		sink.formattedWrite!"%s (line %s, column %s)"(filename, line, column);
-	}
+@safe pure unittest {
+	import std.conv : text;
+	assert(Mark().text == "<unknown>");
+	assert(Mark("test.txt").text == "test.txt");
+	assert(Mark("test.txt", 10).text == "test.txt (line 10)");
+	assert(Mark("test.txt", 10, 4).text == "test.txt (line 10, column 4)");
 }
 
 package enum isNullable(T) = isInstanceOf!(Nullable, T);
@@ -772,7 +792,7 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 		static assert(0, "No matching type for ", T);
 	}
 }
-private T tryConvert(T, V)(V value, Nullable!Mark mark) {
+private T tryConvert(T, V)(V value, Mark mark) {
 	import std.conv : ConvException, to;
 	try {
 		return value.to!T;

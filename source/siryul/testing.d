@@ -387,4 +387,6 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest(constIndirectionTest2);
 
 	runTest([TestEnum.something : 5]);
+
+	assert(collectException!DeserializeException(4.toString!S.fromString!(Test2, S)("keepfilename.txt")).mark.name == "keepfilename.txt");
 }

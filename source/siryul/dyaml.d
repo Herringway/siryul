@@ -23,7 +23,7 @@ struct YAML {
 			deserialize(Node(loader.load()), result, BitFlags!DeSiryulize(flags));
 			return result;
 		} catch (MarkedYAMLException e) {
-			throw new DeserializeException(convertMark(e.mark), format!"Parsing error: %s"(e.msg));
+			throw new DeserializeException(format!"Parsing error: %s"(e.msg), convertMark(e.mark));
 		}
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -36,14 +36,8 @@ struct YAML {
 		dumper.dump(buf, serialize!(Node)(data, BitFlags!Siryulize(flags)).node);
 		return buf.data;
 	}
-	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow @nogc {
-		siryul.common.Mark mark;
-		with (mark) {
-			filename = dyamlMark.name;
-			line = dyamlMark.line;
-			column = dyamlMark.column;
-		}
-		return mark;
+	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow {
+		return siryul.common.Mark(dyamlMark.name, dyamlMark.line ,dyamlMark.column);
 	}
 	static struct Node {
 		private dyaml.Node node = dyaml.Node(YAMLNull());
@@ -68,8 +62,8 @@ struct YAML {
 		private this(dyaml.Node node) @safe pure nothrow @nogc {
 			this.node = node;
 		}
-		Nullable!(siryul.common.Mark) getMark() const @safe pure nothrow {
-			return typeof(return)(convertMark(node.startMark));
+		siryul.common.Mark getMark() const @safe pure nothrow {
+			return convertMark(node.startMark);
 		}
 		bool hasTypeConvertible(T)() const {
 			static if (is(T == typeof(null))) {

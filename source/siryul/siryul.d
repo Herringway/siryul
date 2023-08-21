@@ -66,13 +66,14 @@ T fromFile(T, Format, DeSiryulize flags = DeSiryulize.none)(string path) if (isS
  + T = Type of the data to be deserialized
  + Format = Serialization format
  + str = A string containing serialized data in the specified format
+ + name = A name for the stream, to be used in Marks
  +
  + Supports $(SUPPORTEDSTRUCTURES).
  +
  + Returns: Data contained in the string
  +/
-T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str) if (isSiryulizer!Format && isInputRange!U) {
-	return Format.parseInput!(T, flags)(str, "<string>");
+T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str, string name = "<unknown>") if (isSiryulizer!Format && isInputRange!U) {
+	return Format.parseInput!(T, flags)(str, name);
 }
 ///
 @safe unittest {

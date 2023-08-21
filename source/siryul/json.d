@@ -13,7 +13,7 @@ private import std.typecons;
 struct JSON {
 	package static T parseInput(T, DeSiryulize flags, U)(U data, string filename) if (isInputRange!U && isSomeChar!(ElementType!U)) {
 		T output;
-		deserialize(Node(parseJSON(data)), output, BitFlags!DeSiryulize(flags));
+		deserialize(Node(parseJSON(data), filename), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
 	package static string asString(Siryulize flags, T)(T data) {
@@ -22,29 +22,33 @@ struct JSON {
 	}
 	static struct Node {
 		private JSONValue value;
-		this(T)(T value) if (canStoreUnchanged!T) {
-			this.value = JSONValue(value);
+		string name;
+		this(T)(T value, string name = "<unknown>") if (canStoreUnchanged!T) {
+			this(JSONValue(value), name);
 		}
-		private this(JSONValue value) @safe pure nothrow @nogc {
+		private this(JSONValue value, string name = "<unknown>") @safe pure nothrow @nogc {
 			this.value = value;
+			this.name = name;
 		}
-		this(Node[] newValues) @safe pure {
+		this(Node[] newValues, string name = "<unknown>") @safe pure {
 			JSONValue[] values;
 			values.reserve(newValues.length);
 			foreach (newValue; newValues) {
 				values ~= newValue.value;
 			}
-			this.value = JSONValue(values);
+			this(JSONValue(values), name);
 		}
-		this(Node[string] newValues) @safe pure {
+		this(Node[string] newValues, string name = "<unknown>") @safe pure {
 			JSONValue[string] values;
 			foreach (newKey, newValue; newValues) {
 				values[newKey] = newValue.value;
 			}
-			this.value = JSONValue(values);
+			this(JSONValue(values), name);
 		}
 		enum hasStringIndexing = false;
-		enum getMark = Nullable!Mark.init;
+		Mark getMark() const @safe pure {
+			return Mark(name);
+		}
 		bool hasTypeConvertible(T)() const {
 			static if (is(T == typeof(null))) {
 				return value.type == JSONType.null_;
@@ -106,10 +110,10 @@ struct JSON {
 			value = JSONValue(newValue);
 		}
 		Node opIndex(size_t index) @safe {
-			return Node(value.arrayNoRef[index]);
+			return Node(value.arrayNoRef[index], name);
 		}
 		Node opIndex(string index) @safe {
-			return Node(value.objectNoRef[index]);
+			return Node(value.objectNoRef[index], name);
 		}
 		size_t length() const @safe {
 			return value.arrayNoRef.length;
@@ -119,7 +123,7 @@ struct JSON {
 		}
 		int opApply(scope int delegate(string k, Node v) @safe dg) @safe {
 			foreach (string k, JSONValue v; value.objectNoRef) {
-				const result = dg(k, Node(v));
+				const result = dg(k, Node(v, name));
 				if (result != 0) {
 					return result;
 				}
