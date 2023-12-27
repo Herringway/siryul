@@ -391,4 +391,14 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest([TestEnum.something : 5]);
 
 	assert(collectException!DeserializeException(4.toString!S.fromString!(Test2, S)("keepfilename.txt")).mark.name == "keepfilename.txt");
+	static struct LocationTest {
+		int foo;
+		static uint marks;
+		void siryulMark()(scope const Mark mark) {
+			marks++;
+		}
+	}
+	const locstr = [LocationTest(), LocationTest()].toString!S;
+	const unused = locstr.fromString!(LocationTest[], S)(S.stringof ~ " location test");
+	assert(LocationTest.marks == 2);
 }

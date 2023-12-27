@@ -658,6 +658,9 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 				}
 			}
 		}
+		static if (__traits(compiles, result.siryulMark(Mark.init))) {
+			result.siryulMark(node.getMark());
+		}
 	} else static if (is(T: P*, P)) {
 		result = new P;
 		deserialize(node, *result, flags);
