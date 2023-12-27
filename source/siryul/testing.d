@@ -37,9 +37,10 @@ void runTests(S)() if (isSiryulizer!S) {
 	import std.algorithm : filter;
 	import std.datetime : Date, DateTime, SysTime, TimeOfDay;
 	import std.sumtype : SumType;
-	static void runTest2(T, U)(auto ref T input, auto ref U expected) {
-		import std.format : format;
+	import std.format : format;
+	static void runTest2(T, U, size_t line = __LINE__)(auto ref T input, auto ref U expected) {
 		import std.stdio : writeln;
+		enum testDoc = format!"%s test (line %s)"(S.stringof, line);
 		void writeValue(V)(string str, V value) {
 			static if (isPointer!V && isCopyable!(typeof(*value))) {
 				writeln(str, "\n ", *value);
@@ -53,9 +54,9 @@ void runTests(S)() if (isSiryulizer!S) {
 		}
 		auto gotString = input.toFormattedString!S;
 		debug(verbosetesting) writeln("Serialized:\n", gotString);
-		auto gotValue = gotString.fromString!(U, S);
+		auto gotValue = gotString.fromString!(U, S)(testDoc);
 		static if (!isSumType!U) {
-			auto gotValueOmit = input.toFormattedString!(S, Siryulize.omitInits).fromString!(U, S, DeSiryulize.optionalByDefault);
+			auto gotValueOmit = input.toFormattedString!(S, Siryulize.omitInits).fromString!(U, S, DeSiryulize.optionalByDefault)(testDoc);
 		}
 		debug(verbosetesting) writeValue("Output:", gotValue);
 		static if (isPointer!T && isPointer!U) {
@@ -72,14 +73,15 @@ void runTests(S)() if (isSiryulizer!S) {
 			}
 		}
 	}
-	static void runTest2Fail(T, U)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
-		assertThrown(value.toFormattedString!S.fromString!(T, S), "Expected "~S.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
+	static void runTest2Fail(T, U, size_t linec = __LINE__)(auto ref U value, string file = __FILE__, size_t line = __LINE__) {
+		enum testDoc = format!"%s test (line %s)"(S.stringof, linec);
+		assertThrown(value.toFormattedString!S.fromString!(T, S)(testDoc), "Expected "~S.stringof~" to throw for "~value.text~" to "~T.stringof, file, line);
 	}
-	static void runTest(T)(auto ref T expected) {
-		runTest2(expected, expected);
+	static void runTest(T, size_t line = __LINE__)(auto ref T expected) {
+		runTest2!(T, T, line)(expected, expected);
 	}
-	static void runTestFail(T)(auto ref T expected) {
-		runTest2Fail!T(expected);
+	static void runTestFail(T, size_t line = __LINE__)(auto ref T expected) {
+		runTest2Fail!(T, T, line)(expected);
 	}
 	struct Test {
 		string a;
@@ -156,8 +158,8 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest(testval);
 	testval.value = false;
 	runTest(testval);
-	assert(TestNull2().toFormattedString!S.fromString!(TestNull2, S).value.isNull);
-	assert(Empty().toFormattedString!S.fromString!(TestNull2, S).value.isNull);
+	assert(TestNull2().toFormattedString!S.fromString!(TestNull2, S)(S.stringof ~ " null test").value.isNull);
+	assert(Empty().toFormattedString!S.fromString!(TestNull2, S)(S.stringof ~ " null test 2").value.isNull);
 
 	runTest2Fail!bool("b");
 	runTest2(Nullable!string.init, wstring.init);
@@ -311,8 +313,8 @@ void runTests(S)() if (isSiryulizer!S) {
 	static struct RequiredTest2 {
 		int y;
 	}
-	assert(Empty().toString!S.fromString!(RequiredTest2, S, DeSiryulize.optionalByDefault).y == 0, "Required test failed for "~S.stringof);
-	assertThrown(RequiredTest2(4).toString!S.fromString!(RequiredTest, S, DeSiryulize.optionalByDefault), "Required test failed for "~S.stringof);
+	assert(Empty().toString!S.fromString!(RequiredTest2, S, DeSiryulize.optionalByDefault)(S.stringof ~ " required test").y == 0, "Required test failed for "~S.stringof);
+	assertThrown(RequiredTest2(4).toString!S.fromString!(RequiredTest, S, DeSiryulize.optionalByDefault)(S.stringof ~ " required test 2"), "Required test failed for "~S.stringof);
 	struct SumTestA {
 		int a;
 		string b;
