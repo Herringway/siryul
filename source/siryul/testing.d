@@ -313,6 +313,7 @@ void runTests(S)() if (isSiryulizer!S) {
 	static struct RequiredTest2 {
 		int y;
 	}
+	runTest(RequiredTest());
 	assert(Empty().toString!S.fromString!(RequiredTest2, S, DeSiryulize.optionalByDefault)(S.stringof ~ " required test").y == 0, "Required test failed for "~S.stringof);
 	assertThrown(RequiredTest2(4).toString!S.fromString!(RequiredTest, S, DeSiryulize.optionalByDefault)(S.stringof ~ " required test 2"), "Required test failed for "~S.stringof);
 	struct SumTestA {

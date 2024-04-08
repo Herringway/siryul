@@ -821,7 +821,7 @@ Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (is(T ==
 	foreach (member; FieldNameTuple!T) {
 		alias field = AliasSeq!(__traits(getMember, T, member));
 		static if (!mustSkip!field && (__traits(getProtection, field) == "public")) {
-			if (__traits(getMember, value, member).isSkippableValue(flags)) {
+			if (!isRequired!field && __traits(getMember, value, member).isSkippableValue(flags)) {
 				continue;
 			}
 			enum memberName = getMemberName!field;
