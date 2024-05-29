@@ -788,7 +788,7 @@ void deserialize(T, NodeType, Key...)(scope NodeType node, out T result, BitFlag
 				throw new DeserializeException("Could not parse node as array", node.getMark);
 			} else {
 				import std.conv : to;
-				result = new T(Key[0].max + 1);
+				result = new T(node.length);
 				foreach (string k, NodeType v; node) {
 					typeof(result[0]) val;
 					deserialize(v, val, flags);

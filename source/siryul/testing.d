@@ -406,11 +406,16 @@ void runTests(S)() if (isSiryulizer!S) {
 		static enum Key {
 			a, b, c
 		}
+		static enum Key2 {
+			a, b, c, d
+		}
 		@EnumKey!Key int[] array;
+		@EnumKey!Key2 int[] array2;
 	}
 	static struct EnumKeyTest2 {
 		int[EnumKeyTest.Key] array;
+		int[EnumKeyTest.Key2] array2;
 	}
-	runTest(EnumKeyTest([1,2,3]));
-	runTest2(EnumKeyTest([1,2,3]), EnumKeyTest2([EnumKeyTest.Key.a: 1, EnumKeyTest.Key.b: 2, EnumKeyTest.Key.c: 3]));
+	runTest(EnumKeyTest([1,2,3], [1,2,3]));
+	runTest2(EnumKeyTest([1,2,3], [1,2,3]), EnumKeyTest2([EnumKeyTest.Key.a: 1, EnumKeyTest.Key.b: 2, EnumKeyTest.Key.c: 3], [EnumKeyTest.Key2.a: 1, EnumKeyTest.Key2.b: 2, EnumKeyTest.Key2.c: 3]));
 }
