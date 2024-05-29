@@ -107,6 +107,7 @@ struct SiryulizeAs {
 	///Serialized field name
 	string name;
 }
+private struct EnumKey_(T) {}
 private struct Optional_ {}
 private struct Required_ {}
 private struct Skip_ {}
@@ -122,6 +123,9 @@ enum Required = Required_.init;
 
 ///Used for fields that should be skipped
 enum Skip = Skip_.init;
+
+///Use enum keys for arrays
+enum EnumKey(T) = (EnumKey_!T).init;
 
 /++
  + Use custom parser functions for a given field.
@@ -578,6 +582,10 @@ private template typeMatches(T) {
 	enum typeMatches(alias t) = is(typeof(t) == T);
 }
 
+private template templateMatches(alias T) {
+	enum templateMatches(alias t) = isInstanceOf!(T, typeof(t));
+}
+
 enum isSerializationMethod(alias sym) = Filter!(typeMatches!SerializationMethod_, __traits(getAttributes, sym)).length == 1;
 
 enum isDeserializationMethod(alias sym) = Filter!(typeMatches!DeserializationMethod_, __traits(getAttributes, sym)).length == 1;
@@ -592,13 +600,17 @@ enum shouldStringify(alias sym) = Filter!(typeMatches!AsString_, __traits(getAtt
 
 enum shouldFlagify(alias sym) = Filter!(typeMatches!AsFlags_, __traits(getAttributes, sym)).length == 1;
 
+enum hasEnumKey(alias sym) = Filter!(templateMatches!EnumKey_, __traits(getAttributes, sym)).length == 1;
+
+alias enumKeyOf(alias sym) = TemplateArgsOf!(typeof(Filter!(templateMatches!EnumKey_, __traits(getAttributes, sym))[0]))[0];
+
 package enum Classification {
 	scalar,
 	sequence,
 	mapping,
 }
 
-void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize flags) {
+void deserialize(T, NodeType, Key...)(scope NodeType node, out T result, BitFlags!DeSiryulize flags) {
 	static if (isSomeString!T) {
 		if (node.hasTypeConvertible!(typeof(null))) {
 			// result is already a null string
@@ -653,6 +665,8 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 						deserialize(node[memberName], param, flags);
 					}
 					__traits(getMember, result, member) = fromFunc(param);
+				} else static if (hasEnumKey!field) {
+					deserialize!(typeof(__traits(getMember, result, member)), NodeType, enumKeyOf!field)(node[memberName], __traits(getMember, result, member), flags);
 				} else {
 					deserialize(node[memberName], __traits(getMember, result, member), flags);
 				}
@@ -769,6 +783,18 @@ void deserialize(T, NodeType)(NodeType node, out T result, BitFlags!DeSiryulize 
 			foreach (idx, ref element; result) {
 				deserialize(node[idx], element, flags);
 			}
+		} else if (node.hasClass(Classification.mapping)) {
+			static if (Key.length != 1) {
+				throw new DeserializeException("Could not parse node as array", node.getMark);
+			} else {
+				import std.conv : to;
+				result = new T(Key[0].max + 1);
+				foreach (string k, NodeType v; node) {
+					typeof(result[0]) val;
+					deserialize(v, val, flags);
+					result[k.to!(Key[0])] = val;
+				}
+			}
 		} else {
 			throw new DeserializeException("Could not parse node as array", node.getMark);
 		}
@@ -827,6 +853,8 @@ Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (is(T ==
 			enum memberName = getMemberName!field;
 			static if (hasConvertToFunc!(T, field)) {
 				output[memberName] = serialize!Node(getConvertToFunc!(T, field)(__traits(getMember, value, member)), flags);
+			} else static if (hasEnumKey!field) {
+				output[memberName] = serialize!(Node, enumKeyOf!field)(__traits(getMember, value, member), flags);
 			} else {
 				output[memberName] = serialize!Node(__traits(getMember, value, member), flags);
 			}
@@ -879,6 +907,15 @@ Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isSimpleList
 		output ~= serialize!Node(value, flags);
 	}
 	return Node(output);
+}
+Node serialize(Node, Key, T)(ref T values, BitFlags!Siryulize flags) if (isSimpleList!T && !isNullable!T && !isStaticString!T && !isNullable!T) {
+	EmptyMapping!Node output;
+	foreach (idx, value; values) {
+		auto key = cast(Key)idx;
+		string keyString = serialize!Node(key, flags).getType!string;
+		output[keyString] = serialize!Node(value, flags);
+	}
+	return output.toNode!Node;
 }
 Node serialize(Node, T)(ref T values, BitFlags!Siryulize flags) if (isAssociativeArray!T) {
 	EmptyMapping!Node output;

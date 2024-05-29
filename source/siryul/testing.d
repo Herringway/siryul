@@ -402,4 +402,15 @@ void runTests(S)() if (isSiryulizer!S) {
 	const locstr = [LocationTest(), LocationTest()].toString!S;
 	const unused = locstr.fromString!(LocationTest[], S)(S.stringof ~ " location test");
 	assert(LocationTest.marks == 2);
+	static struct EnumKeyTest {
+		static enum Key {
+			a, b, c
+		}
+		@EnumKey!Key int[] array;
+	}
+	static struct EnumKeyTest2 {
+		int[EnumKeyTest.Key] array;
+	}
+	runTest(EnumKeyTest([1,2,3]));
+	runTest2(EnumKeyTest([1,2,3]), EnumKeyTest2([EnumKeyTest.Key.a: 1, EnumKeyTest.Key.b: 2, EnumKeyTest.Key.c: 3]));
 }
