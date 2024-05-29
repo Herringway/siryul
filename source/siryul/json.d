@@ -116,7 +116,13 @@ struct JSON {
 			return Node(value.objectNoRef[index], name);
 		}
 		size_t length() const @safe {
-			return value.arrayNoRef.length;
+			if (value.type == JSONType.array) {
+				return value.arrayNoRef.length;
+			} else if (value.type == JSONType.object) {
+				return value.objectNoRef.length;
+			} else {
+				throw new DeserializeException("Node has no length", getMark());
+			}
 		}
 		bool opBinaryRight(string op : "in")(string key) {
 			return !!(key in value);
