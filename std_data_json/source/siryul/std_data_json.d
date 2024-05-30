@@ -106,7 +106,13 @@ struct StdDataJSON {
 			return Node(value[index]);
 		}
 		size_t length() const @safe {
-			return value.get!(JSONValue[]).length;
+			if (value.hasType!(JSONValue[])) {
+				return value.get!(JSONValue[]).length;
+			} else if (value.hasType!(JSONValue[string])) {
+				return value.get!(JSONValue[string]).length;
+			} else {
+				throw new DeserializeException("Node has no length", getMark());
+			}
 		}
 		bool opBinaryRight(string op : "in")(string key) {
 			return !!(key in value);
