@@ -15,6 +15,7 @@ private struct Test2 {
 	string inner;
 }
 private enum TestEnum : uint { test = 0, something = 1, wont = 3, ya = 2 }
+private enum TestEnumWithText : uint { test = 0, text = 1 }
 private struct TestNull {
 	import std.typecons : Nullable;
 	uint notNull;
@@ -132,6 +133,7 @@ void runTests(S)() if (isSiryulizer!S) {
 
 	runTest2(TestEnum.something, TestEnum.something);
 	runTest2(TestEnum.something, "something");
+	runTest2(TestEnumWithText.test, "test");
 
 	runTest(TestNull());
 	auto nullableTest2 = TestNull(1, "a");

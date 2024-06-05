@@ -878,7 +878,7 @@ Node serialize(Node)(const typeof(null) value, BitFlags!Siryulize flags) {
 }
 Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (shouldStringify!value || is(T == enum)) {
 	import std.conv : text;
-	return Node(value.text);
+	return Node(text(value));
 }
 Node serialize(Node, T)(ref const T value, BitFlags!Siryulize flags) if (isPointer!T) {
 	return serialize!Node(*value, flags);
