@@ -268,7 +268,7 @@ void runTests(S)() if (isSiryulizer!S) {
 	runTest2(SimpleWrapper(false), CustomSerializer2(true));
 
 	static union SerializableUnion {
-		bool x;
+		float x;
 		int _ignored;
 		@SerializationMethod
 		bool serialize() const @safe {
