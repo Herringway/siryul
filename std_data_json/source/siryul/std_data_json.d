@@ -19,6 +19,7 @@ struct StdDataJSON {
 		T output;
 		auto json = toJSONValue(data);
 		json.location.file = name;
+		json.location.column = 1;
 		deserialize(Node(json), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
