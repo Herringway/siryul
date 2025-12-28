@@ -72,8 +72,8 @@ T fromFile(T, Format, DeSiryulize flags = DeSiryulize.none)(string path) if (isS
  +
  + Returns: Data contained in the string
  +/
-T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str, string name = "<unknown>") if (isSiryulizer!Format && isInputRange!U) {
-	return Format.parseInput!(T, flags)(str, name);
+T fromRange(T, Format, DeSiryulize flags = DeSiryulize.none, U)(ref U range, string name = "<unknown>") if (isSiryulizer!Format && isInputRange!U) {
+	return Format.parseInput!(T, flags)(range, name);
 }
 ///
 @safe unittest {
@@ -85,6 +85,19 @@ T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str, string na
 	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b");
 	assert(aStruct == anotherStruct);
 }
+///
+@safe unittest {
+	struct TestStruct {
+		string a;
+	}
+	//Compare a struct serialized into two different formats
+	const aStruct = fromString!(TestStruct, JSON)(`{"a": "b"}`);
+	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b");
+	assert(aStruct == anotherStruct);
+}
+
+T fromString(T, Format, DeSiryulize flags = DeSiryulize.none)(string str, string name = "<unknown>") => fromRange!(T, Format, flags)(str, name);
+
 /++
  + Serializes data to a string.
  +
@@ -99,7 +112,10 @@ T fromString(T, Format, DeSiryulize flags = DeSiryulize.none,U)(U str, string na
  + Returns: A string in the specified format representing the user's data, UTF-8 encoded
  +/
 @property auto toString(Format, Siryulize flags = Siryulize.none, T)(T data) if (isSiryulizer!Format) {
-	return Format.asString!flags(data);
+	import std.array : appender;
+	auto buf = appender!string;
+	toRange!(Format,flags)(data, buf);
+	return buf.data;
 }
 ///
 @safe unittest {
@@ -126,9 +142,10 @@ alias toFormattedString = toString;
  + path = The path for the file to be written
  +/
 @property void toFile(Format, Siryulize flags = Siryulize.none, T)(T data, string path) if (isSiryulizer!Format) {
-	import std.algorithm : copy;
 	import std.stdio : File;
-	data.toFormattedString!(Format, flags).copy(File(path, "w").lockingTextWriter());
+	auto file = File(path, "w");
+	scope(exit) file.close();
+	toRange!(Format,flags)(data, file.lockingTextWriter());
 }
 ///
 @safe unittest {
@@ -168,4 +185,22 @@ alias toFormattedString = toString;
 	assert("int.yml".fromFile!(uint, YAML) == 3);
 	assert("string.json".fromFile!(string, JSON) == "str");
 	assert("struct.yml".fromFile!(TestStruct, YAML) == TestStruct("b"));
+}
+/++
+ + Serializes data to an output range.
+ +
+ + Any format supported by this library may be specified. If no format is
+ + specified, it will be chosen from the file extension if possible.
+ +
+ + Supports $(SUPPORTEDSTRUCTURES).
+ +
+ + This function will NOT create directories as necessary.
+ +
+ + Params:
+ + Format = Serialization format
+ + data = The data to be serialized
+ + path = The path for the file to be written
+ +/
+@property void toRange(Format, Siryulize flags = Siryulize.none, T, O)(T data, scope auto ref O range) if (isSiryulizer!Format) {
+	return Format.toOutputRange!flags(range, data);
 }

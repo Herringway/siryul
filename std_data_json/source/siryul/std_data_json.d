@@ -23,9 +23,10 @@ struct StdDataJSON {
 		deserialize(Node(json), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
-	package static string asString(Siryulize flags, T)(T data) {
-		const json = serialize!Node(data, BitFlags!Siryulize(flags));
-		return toJSON(json.value);
+	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
+		enum bflags = BitFlags!Siryulize(flags);
+		const json = serialize!Node(data, bflags);
+		writeJSON(json.value, outRange);
 	}
 	static struct Node {
 		private JSONValue value;

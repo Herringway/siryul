@@ -26,15 +26,12 @@ struct YAML {
 			throw new DeserializeException(format!"Parsing error: %s"(e.msg), convertMark(e.mark));
 		}
 	}
-	package static string asString(Siryulize flags, T)(T data) {
-		import std.array : appender;
-		auto buf = appender!string;
+	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
 		auto dumper = dumper();
 		dumper.defaultCollectionStyle = CollectionStyle.block;
 		dumper.defaultScalarStyle = ScalarStyle.plain;
 		dumper.explicitStart = false;
-		dumper.dump(buf, serialize!(Node)(data, BitFlags!Siryulize(flags)).node);
-		return buf.data;
+		dumper.dump(outRange, serialize!(Node)(data, BitFlags!Siryulize(flags)).node);
 	}
 	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow {
 		return siryul.common.Mark(dyamlMark.name, dyamlMark.line ,dyamlMark.column);

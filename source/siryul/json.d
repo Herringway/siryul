@@ -16,9 +16,9 @@ struct JSON {
 		deserialize(Node(parseJSON(data), filename), output, BitFlags!DeSiryulize(flags));
 		return output;
 	}
-	package static string asString(Siryulize flags, T)(T data) {
+	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
 		const json = serialize!Node(data, BitFlags!Siryulize(flags));
-		return toJSON(json.value, true);
+		toJSON(outRange, json.value, true);
 	}
 	static struct Node {
 		private JSONValue value;
