@@ -26,7 +26,13 @@ struct StdDataJSON {
 	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
 		enum bflags = BitFlags!Siryulize(flags);
 		const json = serialize!Node(data, bflags);
-		writeJSON(json.value, outRange);
+		enum baseOpts = GeneratorOptions.init;
+		static if (bflags.noPrettyPrint) {
+			enum opts = baseOpts | GeneratorOptions.compact;
+		} else {
+			enum opts = baseOpts;
+		}
+		writeJSON!opts(json.value, outRange);
 	}
 	static struct Node {
 		private JSONValue value;

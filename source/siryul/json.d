@@ -17,8 +17,9 @@ struct JSON {
 		return output;
 	}
 	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
-		const json = serialize!Node(data, BitFlags!Siryulize(flags));
-		toJSON(outRange, json.value, true);
+		const bflags = BitFlags!Siryulize(flags);
+		const json = serialize!Node(data, bflags);
+		toJSON(outRange, json.value, !bflags.noPrettyPrint);
 	}
 	static struct Node {
 		private JSONValue value;

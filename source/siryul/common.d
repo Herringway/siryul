@@ -10,9 +10,11 @@ import core.time;
 
 ///Serialization options
 enum Siryulize {
-	none, ///Default behaviour
-	omitNulls = 1 << 0, ///Omit null values from output
-	omitInits = 1 << 1 ///Omit values == type.init from output
+	none, /// Default behaviour
+	omitNulls = 1 << 0, /// Omit null values from output
+	omitInits = 1 << 1, /// Omit values == type.init from output
+	omitFluff = 1 << 2, // Omit format data that isn't required
+	noPrettyPrint = 1 << 3, // Don't pretty-print data
 }
 ///Deserialization options
 enum DeSiryulize {

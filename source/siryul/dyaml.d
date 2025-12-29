@@ -27,11 +27,16 @@ struct YAML {
 		}
 	}
 	package static void toOutputRange(Siryulize flags, O, T)(scope auto ref O outRange, T data) {
+		const bflags = BitFlags!Siryulize(flags);
 		auto dumper = dumper();
 		dumper.defaultCollectionStyle = CollectionStyle.block;
 		dumper.defaultScalarStyle = ScalarStyle.plain;
-		dumper.explicitStart = false;
-		dumper.dump(outRange, serialize!(Node)(data, BitFlags!Siryulize(flags)).node);
+		if (flags.omitFluff) {
+			dumper.explicitStart = false;
+			dumper.explicitEnd = false;
+			dumper.YAMLVersion = null;
+		}
+		dumper.dump(outRange, serialize!(Node)(data, bflags).node);
 	}
 	static private siryul.common.Mark convertMark(dyaml.Mark dyamlMark) @safe pure nothrow {
 		return siryul.common.Mark(dyamlMark.name, dyamlMark.line ,dyamlMark.column);
