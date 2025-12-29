@@ -957,7 +957,8 @@ private Node toNode(Node)(EmptyMapping!Node input) {
 template isSiryulizer(T) {
 	debug enum isSiryulizer = true;
 	else enum isSiryulizer = __traits(compiles, () {
+		import std.range : nullSink;
 		uint val = T.parseInput!(uint, DeSiryulize.none)("", "");
-		string str = T.asString!(Siryulize.none)(3);
+		T.toOutputRange!(Siryulize.none)(nullSink, 3);
 	});
 }
