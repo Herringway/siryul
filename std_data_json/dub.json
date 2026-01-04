@@ -7,6 +7,6 @@
 	"homepage": "https://github.com/Herringway/siryul",
 	"dependencies": {
 		"siryul": "*",
-		"std_data_json": "~>0.18.6"
+		"std_data_json": "~>0.18.7"
 	}
 }
