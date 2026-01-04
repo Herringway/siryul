@@ -20,7 +20,7 @@ struct YAML {
 		loader.name = filename;
 		try {
 			T result;
-			deserialize(Node(loader.load()), result, BitFlags!DeSiryulize(flags));
+			deserialize(Node(loader.front), result, BitFlags!DeSiryulize(flags));
 			return result;
 		} catch (MarkedYAMLException e) {
 			throw new DeserializeException(format!"Parsing error: %s"(e.msg), convertMark(e.mark));
@@ -171,4 +171,12 @@ private template expectedTag(T) {
 @safe unittest {
 	import siryul.testing;
 	runTests!YAML();
+}
+
+@safe unittest {
+	import siryul.siryul : fromString;
+	static struct Test {
+		int field;
+	}
+	assert("---\nfield: 42\n---\n]invalid".fromString!(Test, YAML) == Test(42));
 }
