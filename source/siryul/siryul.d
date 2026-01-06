@@ -72,7 +72,7 @@ T fromFile(T, Format, DeSiryulize flags = DeSiryulize.none)(string path) if (isS
  +
  + Returns: Data contained in the string
  +/
-T fromRange(T, Format, DeSiryulize flags = DeSiryulize.none, U)(ref U range, string name = "<unknown>") if (isSiryulizer!Format && isInputRange!U) {
+T fromRange(T, Format, DeSiryulize flags = DeSiryulize.none, U)(auto ref U range, string name = "<unknown>") if (isSiryulizer!Format && isInputRange!U) {
 	return Format.parseInput!(T, flags)(range, name);
 }
 ///
