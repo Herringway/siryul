@@ -86,8 +86,17 @@ T fromRange(T, Format, DeSiryulize flags = DeSiryulize.none, U)(auto ref U range
 	assert(aStruct == anotherStruct);
 }
 
-T fromString(T, Format, DeSiryulize flags = DeSiryulize.none)(string str, string name = "<unknown>") => fromRange!(T, Format, flags)(str, name);
-
+T fromString(T, Format, DeSiryulize flags = DeSiryulize.none)(const(char)[] str, string name = "<unknown>") => fromRange!(T, Format, flags)(str, name);
+///
+@safe unittest {
+	struct TestStruct {
+		string a;
+	}
+	//Compare a struct serialized into two different formats
+	const aStruct = fromString!(TestStruct, JSON)(`{"a": "b"}`.dup);
+	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b".dup);
+	assert(aStruct == anotherStruct);
+}
 /++
  + Serializes data to a string.
  +
