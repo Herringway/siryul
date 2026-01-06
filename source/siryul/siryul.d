@@ -81,18 +81,8 @@ T fromRange(T, Format, DeSiryulize flags = DeSiryulize.none, U)(auto ref U range
 		string a;
 	}
 	//Compare a struct serialized into two different formats
-	const aStruct = fromString!(TestStruct, JSON)(`{"a": "b"}`);
-	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b");
-	assert(aStruct == anotherStruct);
-}
-///
-@safe unittest {
-	struct TestStruct {
-		string a;
-	}
-	//Compare a struct serialized into two different formats
-	const aStruct = fromString!(TestStruct, JSON)(`{"a": "b"}`);
-	const anotherStruct = fromString!(TestStruct, YAML)("---\na: b");
+	const aStruct = fromRange!(TestStruct, JSON)(`{"a": "b"}`);
+	const anotherStruct = fromRange!(TestStruct, YAML)("---\na: b");
 	assert(aStruct == anotherStruct);
 }
 
