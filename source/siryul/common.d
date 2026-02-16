@@ -955,7 +955,7 @@ private Node toNode(Node)(EmptyMapping!Node input) {
  + Determines whether or not the given type is a valid (de)serializer
  +/
 template isSiryulizer(T) {
-	debug enum isSiryulizer = true;
+	debug(fakeFormatSuccess) enum isSiryulizer = true;
 	else enum isSiryulizer = __traits(compiles, () {
 		import std.range : nullSink;
 		uint val = T.parseInput!(uint, DeSiryulize.none)("", "");
