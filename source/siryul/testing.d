@@ -374,6 +374,16 @@ void runTests(S)() if (isSiryulizer!S) {
 	const systime = sampleTime;
 	runTest2(systime, sampleTime);
 	runTest(1.hours);
+
+	static struct NewHelper2 {
+		bool val;
+		static NewHelper2 fromSiryulType()(int val) @safe {
+			return NewHelper2(!!val);
+		}
+	}
+	runTest2(1, NewHelper2(true));
+	runTest2(NewHelper2(true), NewHelper2(true));
+
 	static struct SkipTest {
 		@Skip int val;
 		@Skip int defaultValue = 75;

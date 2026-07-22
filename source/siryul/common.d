@@ -643,39 +643,62 @@ void deserialize(T, NodeType, Key...)(scope NodeType node, out T result, BitFlag
 		}
 	} else static if (is(T == typeof(null))) {
 		// theres' nothing to do here
-	} else static if (is(T == struct) && !isTimeType!T && !is(T == Duration) && !isSumType!T && !isNullable!T && !hasDeserializationMethod!T && !hasDeserializationTemplate!T) {
+	} else static if (isAggregateType!T && !isTimeType!T && !is(T == Duration) && !isSumType!T && !isNullable!T) {
 		import std.exception : enforce;
 		import std.meta : AliasSeq;
 		import std.traits : arity, FieldNameTuple, ForeachType, hasIndirections, isAssociativeArray, isFloatingPoint, isIntegral, isPointer, isSomeChar, isSomeString, isStaticArray, OriginalType, Parameters, PointerTarget, TemplateArgsOf, ValueType;
-		expect(node, Classification.mapping);
-		foreach (member; FieldNameTuple!T) {
-			alias field = AliasSeq!(__traits(getMember, T, member));
-			static if (!mustSkip!field && __traits(getProtection, field) == "public") {
-				const optional = isOptional!field || !!(flags & DeSiryulize.optionalByDefault);
-				enum memberName = getMemberName!field;
-				const valueIsAbsent = (memberName !in node) || (node[memberName].hasTypeConvertible!(typeof(null)));
-				if (optional && !isRequired!field && !hasConvertFromFunc!(T, field) && valueIsAbsent) {
-					continue;
-				}
-				static if (!hasConvertFromFunc!(T, field)) {
-					enforce(memberName in node, new DeserializeException("Missing non-@Optional "~memberName~" in node", node.getMark));
-				}
-				static if (hasConvertFromFunc!(T, field)) {
-					alias fromFunc = getConvertFromFunc!(T, field);
-					Parameters!(fromFunc)[0] param;
-					if (!valueIsAbsent) {
-						deserialize(node[memberName], param, flags);
+
+		/// Try deserializing into the method type as well as the original type
+		try {
+			static if (hasDeserializationMethod!T) {
+				alias fun = deserializationMethod!T;
+				alias T2 = Parameters!(deserializationMethod!T)[0];
+				enum useFun = true;
+			} else static if (hasDeserializationTemplate!T) {
+				alias fun = deserializationTemplate!T;
+				alias T2 = Parameters!(T.fromSiryulType!())[0];
+				enum useFun = true;
+			} else {
+				enum useFun = false;
+			}
+			static if (useFun) {
+				T2 tmp;
+				deserialize(node, tmp, flags);
+				result = fun(tmp);
+				return;
+			}
+		} catch (DeserializeException e) {}
+		static if (!is(T == class) && !is(T == interface)) {
+			expect(node, Classification.mapping);
+			foreach (member; FieldNameTuple!T) {
+				alias field = AliasSeq!(__traits(getMember, T, member));
+				static if (!mustSkip!field && __traits(getProtection, field) == "public") {
+					const optional = isOptional!field || !!(flags & DeSiryulize.optionalByDefault);
+					enum memberName = getMemberName!field;
+					const valueIsAbsent = (memberName !in node) || (node[memberName].hasTypeConvertible!(typeof(null)));
+					if (optional && !isRequired!field && !hasConvertFromFunc!(T, field) && valueIsAbsent) {
+						continue;
 					}
-					__traits(getMember, result, member) = fromFunc(param);
-				} else static if (hasEnumKey!field) {
-					deserialize!(typeof(__traits(getMember, result, member)), NodeType, enumKeyOf!field)(node[memberName], __traits(getMember, result, member), flags);
-				} else {
-					deserialize(node[memberName], __traits(getMember, result, member), flags);
+					static if (!hasConvertFromFunc!(T, field)) {
+						enforce(memberName in node, new DeserializeException("Missing non-@Optional "~memberName~" in node", node.getMark));
+					}
+					static if (hasConvertFromFunc!(T, field)) {
+						alias fromFunc = getConvertFromFunc!(T, field);
+						Parameters!(fromFunc)[0] param;
+						if (!valueIsAbsent) {
+							deserialize(node[memberName], param, flags);
+						}
+						__traits(getMember, result, member) = fromFunc(param);
+					} else static if (hasEnumKey!field) {
+						deserialize!(typeof(__traits(getMember, result, member)), NodeType, enumKeyOf!field)(node[memberName], __traits(getMember, result, member), flags);
+					} else {
+						deserialize(node[memberName], __traits(getMember, result, member), flags);
+					}
 				}
 			}
-		}
-		static if (__traits(compiles, result.siryulMark(Mark.init))) {
-			result.siryulMark(node.getMark());
+			static if (__traits(compiles, result.siryulMark(Mark.init))) {
+				result.siryulMark(node.getMark());
+			}
 		}
 	} else static if (is(T: P*, P)) {
 		result = new P;
@@ -762,14 +785,6 @@ void deserialize(T, NodeType, Key...)(scope NodeType node, out T result, BitFlag
 			expect(node, Classification.scalar);
 			result = cast(T)node.getType!string.front;
 		}
-	} else static if (isAggregateType!T && hasDeserializationMethod!T) {
-		Parameters!(deserializationMethod!T) tmp;
-		deserialize(node, tmp, flags);
-		result = deserializationMethod!T(tmp);
-	} else static if (isAggregateType!T && hasDeserializationTemplate!T) {
-		Parameters!(T.fromSiryulType!()) tmp;
-		deserialize(node, tmp, flags);
-		result = deserializationTemplate!T(tmp);
 	} else static if (is(T: V[K], K, V)) {
 		import std.conv : to;
 		expect(node, Classification.mapping);
