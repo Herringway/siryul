@@ -19,7 +19,7 @@ enum Siryulize {
 ///Deserialization options
 enum DeSiryulize {
 	none, ///Default behaviour
-	optionalByDefault = 1 << 0 ///All members will be considered to be @Optional
+	optionalByDefault = 1 << 0, ///All members will be considered to be @Optional
 }
 /++
  + Thrown when an error occurs
